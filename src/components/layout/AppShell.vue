@@ -1,0 +1,44 @@
+<script setup>
+defineProps({
+  activeView: {
+    type: String,
+    required: true,
+  },
+  subtitle: {
+    type: String,
+    default: '课程与待办作业',
+  },
+})
+
+const emit = defineEmits(['change-view'])
+</script>
+
+<template>
+  <main class="app-shell">
+    <header class="app-header">
+      <div>
+        <h1>CloudPost</h1>
+        <p>{{ subtitle }}</p>
+      </div>
+
+      <nav class="view-tabs" aria-label="页面">
+        <button
+          :class="{ active: activeView === 'study' }"
+          type="button"
+          @click="emit('change-view', 'study')"
+        >
+          首页
+        </button>
+        <button
+          :class="{ active: activeView === 'debug' }"
+          type="button"
+          @click="emit('change-view', 'debug')"
+        >
+          调试
+        </button>
+      </nav>
+    </header>
+
+    <slot />
+  </main>
+</template>
