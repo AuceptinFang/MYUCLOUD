@@ -600,16 +600,14 @@ p {
 .assignment-content-box {
   max-width: 100%;
   margin: 0;
-  padding: 15px 16px;
-  border: 1px solid var(--cloud-blue);
-  border-radius: 8px;
-  background: #ffffff;
-  box-shadow:
-    0 0 0 2px rgba(49, 95, 125, 0.08),
-    0 8px 20px rgba(23, 32, 51, 0.045);
+  padding: 14px 16px;
+  border: 1px solid #d9e5ec;
+  border-radius: 7px;
+  background: var(--cloud-blue-soft);
+  box-shadow: inset 3px 0 0 var(--cloud-blue);
   color: var(--ink);
   font-size: 15px;
-  font-weight: 520;
+  font-weight: 550;
   line-height: 1.75;
   white-space: pre-wrap;
   word-break: break-word;
