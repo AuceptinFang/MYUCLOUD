@@ -72,6 +72,57 @@ function getAssignmentChapter(assignment, detail) {
   return detail?.chapterName || detail?.chapter || assignment?.chapter || '选择作业后显示详情'
 }
 
+function getObjectValue(value) {
+  if (!value) return null
+  if (typeof value === 'object') return value
+  if (typeof value !== 'string') return null
+
+  try {
+    const parsed = JSON.parse(value)
+
+    return parsed && typeof parsed === 'object' ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+function getAssignmentClassName(assignment, detail) {
+  const detailContent = getObjectValue(detail?.assignmentContent)
+  const rawContent = getObjectValue(assignment?.raw?.assignmentContent)
+
+  return (
+    detailContent?.className ||
+    detail?.className ||
+    detail?.assignmentClassName ||
+    rawContent?.className ||
+    assignment?.raw?.className ||
+    assignment?.raw?.assignmentClassName ||
+    assignment?.className ||
+    ''
+  )
+}
+
+function getAssignmentContent(assignment, detail) {
+  return detail?.assignmentContent ?? assignment?.raw?.assignmentContent ?? assignment?.assignmentContent ?? ''
+}
+
+function formatAssignmentContent(assignment, detail) {
+  const content = getAssignmentContent(assignment, detail)
+  const objectContent = getObjectValue(content)
+
+  if (objectContent) return JSON.stringify(objectContent, null, 2)
+  if (content === null || content === undefined || content === '') return ''
+  if (typeof content === 'object') return JSON.stringify(content, null, 2)
+
+  return String(content)
+}
+
+function shouldRenderAssignmentContentHtml(assignment, detail) {
+  const content = getAssignmentContent(assignment, detail)
+
+  return typeof content === 'string' && /<\/?[a-z][\s\S]*>/i.test(content)
+}
+
 function getAssignmentBeginTime(assignment, detail) {
   return detail?.assignmentBeginTime || detail?.beginTime || assignment?.beginTime || ''
 }
@@ -186,7 +237,21 @@ function submitAssignment() {
     <template v-else>
       <div class="assignment-summary">
         <div class="assignment-summary-main">
-          <AssignmentStatus :level="assignment.level" :status="assignment.status" />
+          <div class="assignment-summary-top">
+            <AssignmentStatus :level="assignment.level" :status="assignment.status" />
+            <span v-if="getAssignmentClassName(assignment, detail)" class="assignment-summary-class">
+              班级 {{ getAssignmentClassName(assignment, detail) }}
+            </span>
+          </div>
+          <div
+            v-if="formatAssignmentContent(assignment, detail) && shouldRenderAssignmentContentHtml(assignment, detail)"
+            class="assignment-content-box"
+            v-html="formatAssignmentContent(assignment, detail)"
+          />
+          <pre
+            v-else-if="formatAssignmentContent(assignment, detail)"
+            class="assignment-content-box"
+          >{{ formatAssignmentContent(assignment, detail) }}</pre>
           <p v-if="getAssignmentDescription(assignment, detail)">
             {{ getAssignmentDescription(assignment, detail) }}
           </p>

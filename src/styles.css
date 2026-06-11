@@ -541,8 +541,8 @@ p {
 
 .assignment-summary {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) max-content;
-  gap: 16px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
   align-items: start;
   padding-bottom: 14px;
   border-bottom: 1px solid var(--line);
@@ -554,8 +554,25 @@ p {
   min-width: 0;
 }
 
-.assignment-summary-main .assignment-status {
-  justify-self: start;
+.assignment-summary-top {
+  display: flex;
+  gap: 12px;
+  align-items: start;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.assignment-summary-class {
+  max-width: min(58%, 520px);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.assignment-summary-top .assignment-status {
+  flex: 0 0 auto;
 }
 
 .assignment-summary-main p {
@@ -567,12 +584,47 @@ p {
 }
 
 .assignment-summary-meta {
-  display: grid;
-  gap: 5px;
-  justify-items: end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  min-width: 0;
   color: var(--muted);
   font-size: 13px;
-  text-align: right;
+}
+
+.assignment-summary-meta span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.assignment-content-box {
+  max-width: 100%;
+  margin: 0;
+  padding: 15px 16px;
+  border: 1px solid var(--cloud-blue);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow:
+    0 0 0 2px rgba(49, 95, 125, 0.08),
+    0 8px 20px rgba(23, 32, 51, 0.045);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 520;
+  line-height: 1.75;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.assignment-content-box p {
+  margin: 0;
+}
+
+pre.assignment-content-box {
+  max-height: 220px;
+  overflow: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 400;
 }
 
 .assignment-submit-box {
@@ -842,6 +894,15 @@ p {
   .deadline-time,
   .assignment-summary-meta {
     justify-items: start;
+    text-align: left;
+  }
+
+  .assignment-summary-top {
+    flex-wrap: wrap;
+  }
+
+  .assignment-summary-class {
+    max-width: 100%;
     text-align: left;
   }
 

@@ -1,6 +1,6 @@
 # MYUCLOUD
 
-由于莫名奇妙的问题，我 Linux 下的 Firefox 死活登不进去，遂有此项目。
+由于莫名奇妙的问题，我 Linux 下用 Firefox 死活登不进去，遂有此项目。
 
 目前已支持：
 
