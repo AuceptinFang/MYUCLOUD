@@ -4,7 +4,7 @@ export function getDaysLeft(deadline) {
   const endTime = new Date(deadline).getTime()
   if (Number.isNaN(endTime)) return null
 
-  return Math.ceil((endTime - Date.now()) / (1000 * 60 * 60 * 24))
+  return Math.floor((endTime - Date.now()) / (1000 * 60 * 60 * 24))
 }
 
 export function getDeadlineLevel(daysLeft, isCompleted) {
@@ -23,7 +23,7 @@ export function getAssignmentStatus(record, daysLeft, isCompleted) {
   if (daysLeft < 0) return '已逾期'
   if (daysLeft === 0) return '今天截止'
   if (daysLeft === 1) return '明天截止'
-  if (daysLeft <= 3) return '临近截止'
+  if (daysLeft <= 7) return '临近截止'
 
   return '待完成'
 }
