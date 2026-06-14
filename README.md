@@ -307,6 +307,53 @@ GET https://apiucloud.bupt.edu.cn/blade-source/resource/list/byId?resourceIds=<r
 
 `resourceIds` 是资源/文件 ID，不是作业 ID。虽然路径名是 `byId`，但请求参数必须是复数 `resourceIds`；使用 `resourceId` 会返回 HTTP 400。返回的资源数组在 `data`，常见字段包括 `id`、`name`、`fileSize`、`fileSizeUnit`、`ext`、`storageId`、`link`、`mimeType`、`url`。
 
+#### 作业附件下载
+
+作业详情接口 (`/ykt-site/work/detail`) 返回的 `data.assignmentResource` 只包含文件元数据摘要（`resourceId`、`resourceName`、`resourceType`），没有下载链接。完整流程分两步：
+
+1. 用 `resourceId` 调资源元数据接口拿 `storageId` 和 `ext`
+2. 用 `storageId` + `ext` 构造下载 URL
+
+```http
+GET /file/ucloud/document/<storageId>.<ext>
+```
+
+远程路径：
+
+```text
+GET https://fileucloud.bupt.edu.cn/ucloud/document/<storageId>.<ext>
+```
+
+这个域名是 S3 兼容存储，有两层限制：
+
+- **CORS 白名单**：只允许 `Origin: https://ucloud.bupt.edu.cn`，本地 `localhost` 直接请求会被浏览器拦截
+- **防盗链检查**：校验 `Origin` / `Referer`，同时拒绝携带 `Authorization` / `Blade-Auth` 等业务鉴权头（收到非 AWS4 签名会报 `InvalidRequest`）
+
+因此本地开发需要通过 Vite 代理转发：
+
+```javascript
+// vite.config.js
+'/file': {
+  target: 'https://fileucloud.bupt.edu.cn',
+  changeOrigin: true,                        // 改写 Host 头
+  rewrite: (path) => path.replace(/^\/file/, ''),  // /file/xxx → /xxx
+  headers: {
+    'Origin': 'https://ucloud.bupt.edu.cn',  // 伪装来源，绕过 CORS
+    'Referer': 'https://ucloud.bupt.edu.cn/',
+  },
+  configure: (proxy) => {
+    proxy.on('proxyReq', (proxyReq) => {
+      proxyReq.removeHeader('Authorization'); // 剥离业务鉴权头
+    });
+  }
+},
+```
+
+**关键点**：
+
+- 请求走 Vite 代理后对浏览器是同源（`localhost:5173/file/...`），不存在 CORS 问题
+- 在服务端设置 `Origin` / `Referer` 伪装成学校官网页面发起的请求，绕过防盗链
+
 #### 作业提交
 
 当前作业详情页的提交按钮会请求这个接口。`assignmentId` 使用作业列表返回项的 `id`，`userId` 来自 `/ykt-basics/info` 返回的用户 `id`。

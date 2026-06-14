@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import AssignmentStatus from './AssignmentStatus.vue'
+import { BUSINESS_AUTH, TENANT_ID, TOKEN_KEY } from '../../api/ucloud'
 
 const props = defineProps({
   assignment: {
@@ -186,12 +187,76 @@ function getResourceUrl(item) {
     ''
   const domain = file.domain || file.fileDomain || item?.domain || item?.fileDomain || ''
 
-  if (!path || typeof path !== 'string') return ''
-  if (/^https?:\/\//i.test(path)) return path
-  if (domain) return joinUrl(domain, path)
-  if (path.startsWith('/')) return `https://apiucloud.bupt.edu.cn${path}`
+  if (path && typeof path === 'string') {
+    if (/^https?:\/\//i.test(path)) return path
+    if (domain) return joinUrl(domain, path)
+    if (path.startsWith('/')) return `https://apiucloud.bupt.edu.cn${path}`
+    return path
+  }
 
-  return path
+  const storageId = file.storageId || item?.storageId || ''
+  const ext = file.ext || item?.ext || ''
+
+  if (storageId) {
+    return `/file/ucloud/document/${storageId}.${ext}`
+  }
+
+  return ''
+}
+
+async function downloadResource(resource) {
+  const url = getResourceUrl(resource)
+  if (!url) return
+
+  const isApiUrl = url.startsWith('/ucloud/') || url.includes('apiucloud.bupt.edu.cn')
+  const isFileProxy = url.startsWith('/file/')
+
+  if (isApiUrl) {
+    const token = localStorage.getItem(TOKEN_KEY)
+    const response = await fetch(url, {
+      headers: {
+        'Blade-Auth': token,
+        Authorization: BUSINESS_AUTH,
+        'Tenant-Id': TENANT_ID,
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error(`下载失败 HTTP ${response.status}`)
+    }
+
+    const blob = await response.blob()
+    const blobUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = blobUrl
+    a.download = getResourceName(resource)
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(blobUrl)
+    return
+  }
+
+  if (isFileProxy) {
+    const response = await fetch(url)
+
+    if (!response.ok) {
+      throw new Error(`下载失败 HTTP ${response.status}`)
+    }
+
+    const blob = await response.blob()
+    const blobUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = blobUrl
+    a.download = getResourceName(resource)
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(blobUrl)
+    return
+  }
+
+  window.open(url, '_blank', 'noopener')
 }
 
 function formatFileSize(size) {
@@ -321,10 +386,18 @@ function submitAssignment() {
         <div v-for="(resource, index) in resources" :key="resource.id || index" class="attachment-row">
           <div class="attachment-main">
             <a
-              v-if="getResourceUrl(resource)"
+              v-if="getResourceUrl(resource) && getResourceUrl(resource).startsWith('http')"
               :href="getResourceUrl(resource)"
               rel="noopener"
               target="_blank"
+            >
+              {{ getResourceName(resource) }}
+            </a>
+            <a
+              v-else-if="getResourceUrl(resource)"
+              href="#"
+              rel="noopener"
+              @click.prevent="downloadResource(resource)"
             >
               {{ getResourceName(resource) }}
             </a>

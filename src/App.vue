@@ -231,6 +231,7 @@ function extractAssignmentDetailResources(body) {
   if (!data || typeof data !== 'object') return []
 
   const candidates = [
+    data.assignmentResource,
     data.attachmentVOs,
     data.attachmentList,
     data.attachments,
@@ -755,6 +756,37 @@ async function loadAssignmentSubmitView(assignmentId, requestId) {
   }
 }
 
+async function loadAssignmentResourceDetails(rawResources, requestId) {
+  assignmentResources.value = []
+
+  const resourceIds = rawResources
+    .map((r) => r.resourceId || r.id)
+    .filter(Boolean)
+
+  if (resourceIds.length === 0) {
+    assignmentResources.value = rawResources
+    return
+  }
+
+  try {
+    const resourceCall = await getResourcesById(bladeToken.value, resourceIds.join(','))
+
+    log('study:assignment-resource-details:start', resourceCall.request)
+    log('study:assignment-resource-details:response', resourceCall.result)
+    assertUcloudOk(resourceCall.result, '作业资源详情')
+
+    if (requestId !== assignmentDetailRequestId) return
+
+    const fullResources = extractResourceList(resourceCall.result.body)
+    assignmentResources.value = fullResources.length > 0 ? fullResources : rawResources
+  } catch (error) {
+    logError('study:assignment-resource-details:error', error)
+    if (requestId === assignmentDetailRequestId) {
+      assignmentResources.value = rawResources
+    }
+  }
+}
+
 async function loadSubmitAttachmentResources(attachmentIds, requestId) {
   if (attachmentIds.length === 0) return
 
@@ -813,7 +845,8 @@ async function loadAssignmentResources(assignment) {
     if (requestId !== assignmentDetailRequestId) return
 
     assignmentDetail.value = detailCall.result.body?.data || null
-    assignmentResources.value = extractAssignmentDetailResources(detailCall.result.body)
+    const rawResources = extractAssignmentDetailResources(detailCall.result.body)
+    await loadAssignmentResourceDetails(rawResources, requestId)
     await loadAssignmentSubmitView(assignmentId, requestId)
   } catch (error) {
     if (requestId !== assignmentDetailRequestId) return

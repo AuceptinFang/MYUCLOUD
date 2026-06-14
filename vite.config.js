@@ -20,6 +20,20 @@ export default defineConfig({
         secure: true,
         rewrite: (path) => path.replace(/^\/ucloud/, ''),
       },
+      '/file': {
+        target: 'https://fileucloud.bupt.edu.cn',
+        changeOrigin: true, // 解决 Host 跨域
+        rewrite: (path) => path.replace(/^\/file/, ''),
+        headers: {
+          'Origin': 'https://ucloud.bupt.edu.cn',
+          'Referer': 'https://ucloud.bupt.edu.cn/'
+        },
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq) => {
+            proxyReq.removeHeader('Authorization');
+          });
+        }
+      },
     },
   },
   resolve: {
