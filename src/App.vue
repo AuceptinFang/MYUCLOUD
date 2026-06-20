@@ -1079,6 +1079,12 @@ onMounted(() => {
     loginUrl: loginUrl.value,
     apiUrl: apiUrl.value,
   })
+
+  // 刷新后若本地仍有未过期的 token，自动恢复会话，免去重新点击登录
+  if (bladeToken.value) {
+    log('auth:restore-session', { storageKey: TOKEN_KEY })
+    loadStudyData()
+  }
 })
 
 onUnmounted(() => {

@@ -110,14 +110,27 @@ export function normalizeAssignment(record) {
   }
 }
 
+function toTimestamp(value) {
+  if (!value) return null
+  const time = new Date(value).getTime()
+  return Number.isNaN(time) ? null : time
+}
+
 export function sortAssignments(records) {
   return records.sort((left, right) => {
     const priorityDiff = getAssignmentPriority(left) - getAssignmentPriority(right)
     if (priorityDiff !== 0) return priorityDiff
 
-    const leftTime = left.deadline ? new Date(left.deadline).getTime() : Number.MAX_SAFE_INTEGER
-    const rightTime = right.deadline ? new Date(right.deadline).getTime() : Number.MAX_SAFE_INTEGER
+    const leftDeadline = toTimestamp(left.deadline) ?? Number.MAX_SAFE_INTEGER
+    const rightDeadline = toTimestamp(right.deadline) ?? Number.MAX_SAFE_INTEGER
 
-    return leftTime - rightTime
+    // 已完成的作业倒序排列：最近提交（缺失时回退到最近截止）的排最前
+    if (left.isCompleted && right.isCompleted) {
+      const leftTime = toTimestamp(left.submitTime) ?? toTimestamp(left.deadline) ?? 0
+      const rightTime = toTimestamp(right.submitTime) ?? toTimestamp(right.deadline) ?? 0
+      return rightTime - leftTime
+    }
+
+    return leftDeadline - rightDeadline
   })
 }
