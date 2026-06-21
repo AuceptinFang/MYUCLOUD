@@ -7,6 +7,7 @@ import {
   TENANT_ID,
   TOKEN_KEY,
   assertUcloudOk,
+  isTokenExpired,
   businessHeaders,
   getAssignments,
   getAssignmentDetail,
@@ -410,7 +411,7 @@ async function refreshAssignmentsAfterSubmit(assignmentId, submitTime) {
 
     log('study:assignments-after-submit:start', assignmentCall.request)
     log('study:assignments-after-submit:response', assignmentCall.result)
-    assertUcloudOk(assignmentCall.result, '提交后作业列表')
+    checkAuth(assignmentCall.result, '提交后作业列表')
 
     assignments.value = sortAssignments(
       (assignmentCall.result.body?.data?.records || []).map((record) => {
@@ -455,7 +456,7 @@ async function buildAssignmentCourseMap(courseRecords) {
         })
         log('study:assignment-course-map:start', assignmentCall.request)
         log('study:assignment-course-map:response', assignmentCall.result)
-        assertUcloudOk(assignmentCall.result, '课程作业映射')
+        checkAuth(assignmentCall.result, '课程作业映射')
 
         return (assignmentCall.result.body?.data?.records || []).map((record) => [
           String(record.id || ''),
@@ -581,7 +582,7 @@ async function loadStudyData() {
     const userCall = await getUserInfo(bladeToken.value)
     log('study:user-info:start', userCall.request)
     log('study:user-info:response', userCall.result)
-    assertUcloudOk(userCall.result, '用户信息')
+    checkAuth(userCall.result, '用户信息')
 
     const user = userCall.result.body?.data || null
     if (!user?.id) {
@@ -592,7 +593,7 @@ async function loadStudyData() {
     const courseCall = await getStudentCourses(bladeToken.value, user.id)
     log('study:courses:start', courseCall.request)
     log('study:courses:response', courseCall.result)
-    assertUcloudOk(courseCall.result, '课程列表')
+    checkAuth(courseCall.result, '课程列表')
     courses.value = courseCall.result.body?.data?.records || []
     const assignmentCourseMap = await buildAssignmentCourseMap(courses.value)
 
@@ -602,7 +603,7 @@ async function loadStudyData() {
     })
     log('study:assignments:start', assignmentCall.request)
     log('study:assignments:response', assignmentCall.result)
-    assertUcloudOk(assignmentCall.result, '作业列表')
+    checkAuth(assignmentCall.result, '作业列表')
     assignments.value = sortAssignments(
       (assignmentCall.result.body?.data?.records || []).map((record) => {
         const course = assignmentCourseMap.get(String(record.id || '')) || {}
@@ -657,7 +658,7 @@ async function loadCourseResources(course) {
 
     log('study:course-resources:start', resourceCall.request)
     log('study:course-resources:response', resourceCall.result)
-    assertUcloudOk(resourceCall.result, '课程资料')
+    checkAuth(resourceCall.result, '课程资料')
 
     if (requestId !== courseResourceRequestId) return
 
@@ -706,7 +707,7 @@ async function loadCourseAssignments(course = selectedCourse.value) {
 
     log('study:course-assignments:start', assignmentCall.request)
     log('study:course-assignments:response', assignmentCall.result)
-    assertUcloudOk(assignmentCall.result, '课程作业')
+    checkAuth(assignmentCall.result, '课程作业')
 
     if (requestId !== courseAssignmentRequestId) return
 
@@ -773,7 +774,7 @@ async function loadAssignmentResourceDetails(rawResources, requestId) {
 
     log('study:assignment-resource-details:start', resourceCall.request)
     log('study:assignment-resource-details:response', resourceCall.result)
-    assertUcloudOk(resourceCall.result, '作业资源详情')
+    checkAuth(resourceCall.result, '作业资源详情')
 
     if (requestId !== assignmentDetailRequestId) return
 
@@ -798,7 +799,7 @@ async function loadSubmitAttachmentResources(attachmentIds, requestId) {
 
       log('study:submit-attachment-resource:start', resourceCall.request)
       log('study:submit-attachment-resource:response', resourceCall.result)
-      assertUcloudOk(resourceCall.result, '提交附件资源')
+      checkAuth(resourceCall.result, '提交附件资源')
 
       resources.push(...extractResourceList(resourceCall.result.body))
     }
@@ -840,7 +841,7 @@ async function loadAssignmentResources(assignment) {
 
     log('study:assignment-detail:start', detailCall.request)
     log('study:assignment-detail:response', detailCall.result)
-    assertUcloudOk(detailCall.result, '作业详情')
+    checkAuth(detailCall.result, '作业详情')
 
     if (requestId !== assignmentDetailRequestId) return
 
@@ -954,7 +955,7 @@ async function uploadAssignmentFiles(files) {
 
     log('study:attachment-upload:start', uploadCall.request)
     log('study:attachment-upload:response', uploadCall.result)
-    assertUcloudOk(uploadCall.result, '附件上传')
+    checkAuth(uploadCall.result, '附件上传')
 
     const attachmentId = pickUploadAttachmentId(uploadCall.result.body)
     if (!attachmentId) {
@@ -1014,7 +1015,7 @@ async function submitSelectedAssignment({ assignment, content, files = [] }) {
       localFiles,
     })
     log('study:assignment-submit:response', submitCall.result)
-    assertUcloudOk(submitCall.result, '作业提交')
+    checkAuth(submitCall.result, '作业提交')
 
     assignmentSubmitResult.value = submitCall.result.body || {
       status: submitCall.result.status,
@@ -1059,6 +1060,21 @@ function clearToken() {
   log('auth:token-cleared', {
     storageKey: TOKEN_KEY,
   })
+}
+
+function handleTokenExpiry(source) {
+  log('auth:token-expired', { source })
+  clearToken()
+  studyError.value = 'Token 已过期，请重新登录'
+  setView('study')
+}
+
+function checkAuth(result, label) {
+  if (isTokenExpired(result)) {
+    handleTokenExpiry(label)
+    throw new Error('Token 已过期，请重新登录')
+  }
+  assertUcloudOk(result, label)
 }
 
 function clearLogs() {

@@ -243,6 +243,7 @@ p {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
+  padding: 0px 0px 0px 30px;
 }
 
 .metric-card {
@@ -842,17 +843,34 @@ pre.assignment-content-box {
   gap: 8px;
   padding-top: 14px;
   border-top: 1px solid var(--line);
+  cursor: pointer;
+  user-select: none;
+}
+
+.log-item:hover .log-meta strong {
+  color: var(--cloud-blue);
 }
 
 .log-meta {
   display: flex;
   flex-wrap: wrap;
-  justify-content: space-between;
+  align-items: center;
   gap: 8px;
 }
 
 .log-meta strong {
   color: var(--ink);
+  flex: 1;
+}
+
+.log-toggle {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.log-meta time {
+  margin-left: auto;
 }
 
 .empty-state {

@@ -41,4 +41,6 @@ __screenshots__/
 # Local auth/debug artifacts
 cookies.txt
 
+ucloud/
+ucloud-bot/
 DESIGN_SYSTEM.md

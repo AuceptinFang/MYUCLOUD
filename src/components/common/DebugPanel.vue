@@ -1,4 +1,6 @@
 <script setup>
+import { reactive } from 'vue'
+
 defineProps({
   loginUrl: {
     type: String,
@@ -54,6 +56,17 @@ const emit = defineEmits([
   'clear-token',
   'clear-logs',
 ])
+
+const expanded = reactive({})
+
+function logKey(item) {
+  return `${item.time}-${item.label}`
+}
+
+function toggleLog(item) {
+  const key = logKey(item)
+  expanded[key] = !expanded[key]
+}
 
 function toJson(value) {
   return JSON.stringify(value, null, 2)
@@ -128,12 +141,21 @@ function toJson(value) {
       </div>
 
       <p v-if="logs.length === 0" class="empty-state">暂无日志</p>
-      <article v-for="item in logs" :key="`${item.time}-${item.label}`" class="log-item">
+      <article
+        v-for="item in logs"
+        :key="logKey(item)"
+        class="log-item"
+        role="button"
+        tabindex="0"
+        @click="toggleLog(item)"
+        @keydown.enter="toggleLog(item)"
+      >
         <div class="log-meta">
           <strong>{{ item.label }}</strong>
+          <span class="log-toggle">{{ expanded[logKey(item)] ? '收起' : '展开' }}</span>
           <time>{{ item.time }}</time>
         </div>
-        <pre class="code-block">{{ toJson(item.data) }}</pre>
+        <pre v-if="expanded[logKey(item)]" class="code-block">{{ toJson(item.data) }}</pre>
       </article>
     </section>
   </section>

@@ -104,6 +104,10 @@ export function pickToken(body) {
   return candidates.find((value) => typeof value === 'string' && value.length > 0) || ''
 }
 
+export function isTokenExpired(result) {
+  return !!(result && (result.status === 401 || result.body?.code === 401))
+}
+
 export async function getUserInfo(token) {
   const request = {
     url: API_PATHS.userInfo,

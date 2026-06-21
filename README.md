@@ -307,6 +307,52 @@ GET https://apiucloud.bupt.edu.cn/blade-source/resource/list/byId?resourceIds=<r
 
 `resourceIds` 是资源/文件 ID，不是作业 ID。虽然路径名是 `byId`，但请求参数必须是复数 `resourceIds`；使用 `resourceId` 会返回 HTTP 400。返回的资源数组在 `data`，常见字段包括 `id`、`name`、`fileSize`、`fileSizeUnit`、`ext`、`storageId`、`link`、`mimeType`、`url`。
 
+#### 资源预览链接
+
+```http
+GET /ucloud/blade-source/resource/preview-url?resourceId=<resourceId>
+Blade-Auth: <access_token>
+Authorization: Basic c3dvcmQ6c3dvcmRfc2VjcmV0
+Tenant-Id: 000000
+```
+
+远程路径：
+
+```text
+GET https://apiucloud.bupt.edu.cn/blade-source/resource/preview-url?resourceId=<resourceId>
+```
+
+返回预览所需参数：
+
+```json
+{
+  "code": 200,
+  "success": true,
+  "data": {
+    "previewUrl": "https://fileucloud.bupt.edu.cn/ucloud/document/<storageId>.<ext>?...",
+    "onlinePreview": "https://ucloud.bupt.edu.cn/office/?ssl=1&n=1&bclr=000&furl="
+  },
+  "msg": "操作成功"
+}
+```
+
+- `previewUrl` — 文件直链，带 `response-content-disposition=attachment` 参数，用于下载
+- `onlinePreview` — Office 在线预览基础地址
+
+拿到这两个字段后拼接 ucloud 预览页 URL：
+
+```text
+https://ucloud.bupt.edu.cn/uclass/course.html#/resourceLearn
+  ?onlinePreview=<onlinePreview>
+  &previewUrl=<previewUrl>
+  &resourceId=<resourceId>
+  &ext=<文件后缀>
+```
+
+四个参数值都需要 URL encode。这个页面支持 PDF 内嵌预览以及 Office 文档在线查看。
+
+注意：参数名是单数 `resourceId`（不是 `resourceIds`），和资源元数据接口不一样。
+
 #### 作业附件下载
 
 作业详情接口 (`/ykt-site/work/detail`) 返回的 `data.assignmentResource` 只包含文件元数据摘要（`resourceId`、`resourceName`、`resourceType`），没有下载链接。完整流程分两步：
@@ -542,6 +588,31 @@ curl -sS 'https://apiucloud.bupt.edu.cn/ykt-basics/info' \
   -H 'Authorization: Basic c3dvcmQ6c3dvcmRfc2VjcmV0' \
   -H 'Tenant-Id: 000000'
 ```
+
+## TODO
+
+目前已支持作业（bizType / type = 3），云平台还有另外两种任务类型未接入：
+
+| 类型 | bizType | 说明 | 接口 |
+|---|---|---|---|
+| 问卷 | 2 | 待完成调查问卷 | `GET /ucloud/ykt-activity/survey/page/todo?level=1&size=9999999&userId=<userId>&siteId=<siteId>` |
+| 测验 | 4 | 待完成在线测验 | `GET /ucloud/ykt-site/examination/list-stu?current=1&size=999999&status=-1&siteId=<siteId>&statusSelf=未提交&state=-1` |
+
+此外还有一个聚合接口，可以一次性拉回三种类型的待办列表：
+
+```text
+GET /ucloud/ykt-site/site/student/undone?userId=<userId>
+```
+
+返回 `data.undoneList`，每条含 `activityId`、`type`（2/3/4）、`endTime`、`activityName`，已经关联好 `courseInfo`（`id`、`name`、`teachers`），不需要像 `/search` 那样遍历课程反向匹配。
+
+远程路径：
+
+| 代理路径 | 远程 |
+|---|---|
+| `/ucloud/ykt-site/site/student/undone?...` | `https://apiucloud.bupt.edu.cn/ykt-site/site/student/undone?...` |
+| `/ucloud/ykt-activity/survey/page/todo?...` | `https://apiucloud.bupt.edu.cn/ykt-activity/survey/page/todo?...` |
+| `/ucloud/ykt-site/examination/list-stu?...` | `https://apiucloud.bupt.edu.cn/ykt-site/examination/list-stu?...` |
 
 ## 致谢
 
