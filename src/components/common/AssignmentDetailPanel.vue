@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import AssignmentStatus from './AssignmentStatus.vue'
-import { BUSINESS_AUTH, TENANT_ID, TOKEN_KEY } from '../../api/ucloud'
+import { BUSINESS_AUTH, TENANT_ID, TOKEN_KEY, getResourcePreviewUrl, pickPreviewData } from '../../api/ucloud'
 
 const props = defineProps({
   assignment: {
@@ -44,6 +44,8 @@ const fileInput = ref(null)
 const pickedFiles = ref([])
 const assignmentContent = ref('')
 const resourceCount = computed(() => props.resources.length)
+const previewingId = ref('')
+const downloadingId = ref('')
 
 watch(
   () => props.assignment?.id,
@@ -202,6 +204,77 @@ function getResourceUrl(item) {
   }
 
   return ''
+}
+
+function getItemResourceId(item) {
+  const file = getFileResource(item)
+  return file.id || file.resourceId || ''
+}
+
+function getItemExt(item) {
+  const file = getFileResource(item)
+  return file.ext || file.fileType || file.suffix || ''
+}
+
+async function previewResource(resource) {
+  const resourceId = getItemResourceId(resource)
+  if (!resourceId) return
+
+  previewingId.value = resourceId
+  try {
+    const token = localStorage.getItem(TOKEN_KEY)
+    if (!token) return
+
+    const { result } = await getResourcePreviewUrl(token, resourceId)
+    if (!result.ok || result.body?.code !== 200) return
+
+    const { previewUrl, onlinePreview } = pickPreviewData(result.body)
+
+    const params = new URLSearchParams()
+    if (onlinePreview) params.set('onlinePreview', onlinePreview)
+    if (previewUrl) params.set('previewUrl', previewUrl)
+    params.set('resourceId', resourceId)
+    const ext = getItemExt(resource)
+    if (ext) params.set('ext', ext)
+
+    window.open(
+      `https://ucloud.bupt.edu.cn/uclass/course.html#/resourceLearn?${params.toString()}`,
+      '_blank',
+      'noopener',
+    )
+  } catch { /* 静默 */ }
+  previewingId.value = ''
+}
+
+async function downloadFile(resource) {
+  const resourceId = getItemResourceId(resource)
+  if (!resourceId) return
+
+  downloadingId.value = resourceId
+  try {
+    const token = localStorage.getItem(TOKEN_KEY)
+    if (!token) return
+
+    const { result } = await getResourcePreviewUrl(token, resourceId)
+    if (!result.ok || result.body?.code !== 200) return
+
+    const { previewUrl } = pickPreviewData(result.body)
+    if (!previewUrl) return
+
+    const response = await fetch(previewUrl)
+    if (!response.ok) return
+
+    const blob = await response.blob()
+    const blobUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = blobUrl
+    a.download = getResourceName(resource)
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(blobUrl)
+  } catch { /* 静默 */ }
+  downloadingId.value = ''
 }
 
 async function downloadResource(resource) {
@@ -386,23 +459,24 @@ function submitAssignment() {
         <div v-for="(resource, index) in resources" :key="resource.id || index" class="attachment-row">
           <div class="attachment-main">
             <a
-              v-if="getResourceUrl(resource) && getResourceUrl(resource).startsWith('http')"
-              :href="getResourceUrl(resource)"
-              rel="noopener"
-              target="_blank"
-            >
-              {{ getResourceName(resource) }}
-            </a>
-            <a
-              v-else-if="getResourceUrl(resource)"
+              v-if="getResourceUrl(resource)"
+              :class="{ 'link-loading': previewingId === getItemResourceId(resource) }"
               href="#"
               rel="noopener"
-              @click.prevent="downloadResource(resource)"
+              @click.prevent="previewResource(resource)"
             >
               {{ getResourceName(resource) }}
             </a>
             <strong v-else>{{ getResourceName(resource) }}</strong>
             <span v-if="getResourceMeta(resource)">{{ getResourceMeta(resource) }}</span>
+            <button
+              v-if="getResourceUrl(resource)"
+              :disabled="downloadingId === getItemResourceId(resource)"
+              class="download-btn"
+              title="下载"
+              type="button"
+              @click.stop="downloadFile(resource)"
+            >↓</button>
           </div>
         </div>
       </div>

@@ -1,5 +1,12 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import {
+  BUSINESS_AUTH,
+  TENANT_ID,
+  TOKEN_KEY,
+  getResourcePreviewUrl,
+  pickPreviewData,
+} from '../../api/ucloud'
 
 const props = defineProps({
   course: {
@@ -116,6 +123,80 @@ function getDepthStyle(row) {
     paddingLeft: `${row.depth * 18}px`,
   }
 }
+
+const previewingId = ref('')
+const downloadingId = ref('')
+
+function getAttachmentResourceId(attachment) {
+  const resource = getAttachmentResource(attachment)
+  return resource.id || resource.resourceId || ''
+}
+
+function getAttachmentExt(attachment) {
+  const resource = getAttachmentResource(attachment)
+  return resource.ext || resource.fileType || ''
+}
+
+async function previewAttachment(attachment) {
+  const resourceId = getAttachmentResourceId(attachment)
+  if (!resourceId) return
+
+  previewingId.value = resourceId
+  try {
+    const token = localStorage.getItem(TOKEN_KEY)
+    if (!token) return
+
+    const { result } = await getResourcePreviewUrl(token, resourceId)
+    if (!result.ok || result.body?.code !== 200) return
+
+    const { previewUrl, onlinePreview } = pickPreviewData(result.body)
+
+    const params = new URLSearchParams()
+    if (onlinePreview) params.set('onlinePreview', onlinePreview)
+    if (previewUrl) params.set('previewUrl', previewUrl)
+    params.set('resourceId', resourceId)
+    const ext = getAttachmentExt(attachment)
+    if (ext) params.set('ext', ext)
+
+    window.open(
+      `https://ucloud.bupt.edu.cn/uclass/course.html#/resourceLearn?${params.toString()}`,
+      '_blank',
+      'noopener',
+    )
+  } catch { /* 静默 */ }
+  previewingId.value = ''
+}
+
+async function downloadAttachment(attachment) {
+  const resourceId = getAttachmentResourceId(attachment)
+  if (!resourceId) return
+
+  downloadingId.value = resourceId
+  try {
+    const token = localStorage.getItem(TOKEN_KEY)
+    if (!token) return
+
+    const { result } = await getResourcePreviewUrl(token, resourceId)
+    if (!result.ok || result.body?.code !== 200) return
+
+    const { previewUrl } = pickPreviewData(result.body)
+    if (!previewUrl) return
+
+    const response = await fetch(previewUrl)
+    if (!response.ok) return
+
+    const blob = await response.blob()
+    const blobUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = blobUrl
+    a.download = getAttachmentName(attachment)
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(blobUrl)
+  } catch { /* 静默 */ }
+  downloadingId.value = ''
+}
 </script>
 
 <template>
@@ -151,13 +232,22 @@ function getDepthStyle(row) {
           <template v-else>
             <a
               v-if="getAttachmentUrl(row.attachment)"
-              :href="getAttachmentUrl(row.attachment)"
+              :class="{ 'link-loading': previewingId === getAttachmentResourceId(row.attachment) }"
+              href="#"
               rel="noopener"
-              target="_blank"
+              @click.prevent="previewAttachment(row.attachment)"
             >
               {{ getAttachmentName(row.attachment) }}
             </a>
             <span v-else>{{ getAttachmentName(row.attachment) }}</span>
+            <button
+              v-if="getAttachmentUrl(row.attachment)"
+              :disabled="downloadingId === getAttachmentResourceId(row.attachment)"
+              class="download-btn"
+              title="下载"
+              type="button"
+              @click.stop="downloadAttachment(row.attachment)"
+            >↓</button>
           </template>
         </div>
         <span v-if="row.type === 'attachment'" class="resource-extra">

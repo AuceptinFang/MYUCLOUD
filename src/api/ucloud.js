@@ -14,6 +14,7 @@ const API_PATHS = {
   courseResources: '/ucloud/ykt-site/site-resource/tree/student',
   resourcesById: '/ucloud/blade-source/resource/list/byId',
   resourceUploadBiz: '/ucloud/blade-source/resource/upload/biz',
+  resourcePreviewUrl: '/ucloud/blade-source/resource/preview-url',
 }
 
 function parseBody(text) {
@@ -297,6 +298,34 @@ export async function uploadBusinessResource(token, { file, userId, bizType = 3 
     method: request.method,
     headers: request.headers,
     body: formData,
+  })
+
+  return {
+    request,
+    result: await readResponse(response),
+  }
+}
+
+export function pickPreviewData(body) {
+  const data = body?.data ?? body
+  if (!data || typeof data !== 'object') return { previewUrl: '', onlinePreview: '' }
+
+  return {
+    previewUrl: typeof data.previewUrl === 'string' ? data.previewUrl : '',
+    onlinePreview: typeof data.onlinePreview === 'string' ? data.onlinePreview : '',
+  }
+}
+
+export async function getResourcePreviewUrl(token, resourceId) {
+  const params = new URLSearchParams({ resourceId })
+  const request = {
+    url: `${API_PATHS.resourcePreviewUrl}?${params}`,
+    method: 'GET',
+    headers: businessHeaders(token),
+  }
+  const response = await fetch(request.url, {
+    method: request.method,
+    headers: request.headers,
   })
 
   return {

@@ -922,3 +922,38 @@ pre.assignment-content-box {
     white-space: normal;
   }
 }
+
+.download-btn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  min-height: 0;
+  border: 1px solid #d4d8df;
+  border-radius: 5px;
+  background: #ffffff;
+  color: #667085;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 0;
+}
+
+.download-btn:hover {
+  border-color: var(--cloud-blue);
+  color: var(--cloud-blue);
+  background: var(--cloud-blue-soft);
+}
+
+.download-btn:disabled {
+  cursor: wait;
+  opacity: 0.45;
+}
+
+.link-loading {
+  opacity: 0.5;
+  cursor: wait;
+  text-decoration: none !important;
+}
