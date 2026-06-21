@@ -99,10 +99,7 @@ function getAttachmentName(attachment) {
 function getAttachmentMeta(attachment) {
   const resource = getAttachmentResource(attachment)
   const ext = resource.ext || resource.fileType || ''
-  const size =
-    resource.fileSize && resource.fileSizeUnit
-      ? `${resource.fileSize}${resource.fileSizeUnit}`
-      : resource.size || ''
+  const size = resource.fileSizeUnit || resource.size || ''
 
   return [ext, size].filter(Boolean).join(' · ')
 }
@@ -240,18 +237,18 @@ async function downloadAttachment(attachment) {
               {{ getAttachmentName(row.attachment) }}
             </a>
             <span v-else>{{ getAttachmentName(row.attachment) }}</span>
-            <button
-              v-if="getAttachmentUrl(row.attachment)"
-              :disabled="downloadingId === getAttachmentResourceId(row.attachment)"
-              class="download-btn"
-              title="下载"
-              type="button"
-              @click.stop="downloadAttachment(row.attachment)"
-            >↓</button>
           </template>
         </div>
         <span v-if="row.type === 'attachment'" class="resource-extra">
           {{ getAttachmentMeta(row.attachment) }}
+          <button
+            v-if="getAttachmentUrl(row.attachment)"
+            :disabled="downloadingId === getAttachmentResourceId(row.attachment)"
+            class="download-btn"
+            title="下载"
+            type="button"
+            @click.stop="downloadAttachment(row.attachment)"
+          >↓</button>
         </span>
       </div>
     </div>

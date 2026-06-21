@@ -160,10 +160,7 @@ function getResourceName(item) {
 function getResourceMeta(item) {
   const file = getFileResource(item)
   const ext = file.ext || file.fileType || file.suffix || ''
-  const size =
-    file.fileSize && file.fileSizeUnit
-      ? `${file.fileSize}${file.fileSizeUnit}`
-      : file.size || file.fileSize || ''
+  const size = file.fileSizeUnit || file.size || file.fileSize || ''
   const mime = file.mimeType || file.contentType || ''
 
   return [ext, size, mime].filter(Boolean).join(' · ')
