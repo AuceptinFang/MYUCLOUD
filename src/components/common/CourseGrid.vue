@@ -35,7 +35,6 @@ function getTeacherNames(course) {
     <div class="section-header">
       <div>
         <h2>课程</h2>
-        <p>当前学期</p>
       </div>
       <span class="section-count">{{ courses.length }}</span>
     </div>

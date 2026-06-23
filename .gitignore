@@ -44,3 +44,6 @@ cookies.txt
 ucloud/
 ucloud-bot/
 DESIGN_SYSTEM.md
+
+# Proprietary Microsoft YaHei font — self-hosted locally, do not redistribute
+public/fonts/msyh.ttf

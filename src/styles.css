@@ -1,3 +1,14 @@
+/* Microsoft YaHei (微软雅黑) — self-hosted for CJK text.
+   Per-codepoint fallback in the font stacks below routes Latin/English to a
+   monospace font and CJK characters to this YaHei webfont. */
+@font-face {
+  font-family: "Microsoft YaHei";
+  src: url("/fonts/msyh.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   color-scheme: light;
   --cloud-blue: #315f7d;
@@ -25,8 +36,13 @@ body {
   margin: 0;
   background: #f6f7f9;
   color: var(--ink);
+  /* Per-codepoint selection: Latin/English hits the monospace stack first
+     (those fonts carry no CJK glyphs), so CJK characters fall through to the
+     self-hosted "Microsoft YaHei" webfont (see @font-face above). Noto Sans
+     CJK SC is only a safety net if that file fails to load. */
   font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    "JetBrains Mono", "Cascadia Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Microsoft YaHei", "微软雅黑", "Noto Sans CJK SC", monospace;
 }
 
 button,
@@ -621,7 +637,8 @@ p {
 pre.assignment-content-box {
   max-height: 220px;
   overflow: auto;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Microsoft YaHei",
+    "微软雅黑", "Noto Sans CJK SC", monospace;
   font-size: 12px;
   font-weight: 400;
 }
