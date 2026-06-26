@@ -34,7 +34,14 @@
 
 body {
   margin: 0;
-  background: #f6f7f9;
+  min-height: 100vh;
+  /* Cloud-themed ambient backdrop: a single soft sky tint fading down into the
+     neutral page color. One hue, low contrast, no scattered glows — keeps it
+     clean and lets the white paper cards stay the focus. */
+  background-color: #f6f7f9;
+  background-image: linear-gradient(180deg, #ebf1f5 0%, #f6f7f9 320px);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
   color: var(--ink);
   /* Per-codepoint selection: Latin/English hits the monospace stack first
      (those fonts carry no CJK glyphs), so CJK characters fall through to the
