@@ -888,6 +888,35 @@ function showCourseAssignments() {
   loadCourseAssignments(selectedCourse.value)
 }
 
+// 从作业详情返回所属课程：把 selectedCourse 对齐到当前作业的课程，
+// 再切到课程视图的对应面板（资料/作业）。两个 tab 在详情页都不点亮，
+// 点击即回课程列表，方便接着看同课程的下一个作业或资料。
+function backToCourse(panel) {
+  const assignment = selectedAssignment.value
+  const courseId = assignment?.courseId || getCourseId(assignment?.raw)
+  if (!courseId) {
+    setView('study')
+    return
+  }
+
+  selectedCourse.value = {
+    id: courseId,
+    siteId: courseId,
+    siteName: assignment?.courseName || getCourseName(selectedCourse.value),
+  }
+  routeCourseId.value = courseId
+  setCourseHash(courseId)
+  activeCoursePanel.value = panel
+  resetCourseAssignments()
+  activeView.value = 'course'
+
+  if (panel === 'assignments') {
+    loadCourseAssignments(selectedCourse.value)
+  } else {
+    loadCourseResources(selectedCourse.value)
+  }
+}
+
 function openAssignment(assignment) {
   const assignmentId = getAssignmentId(assignment)
 
@@ -1210,6 +1239,10 @@ onUnmounted(() => {
     <template v-else-if="activeView === 'assignment'">
       <div class="detail-actions">
         <button class="button-secondary" type="button" @click="setView('study')">返回首页</button>
+        <div class="detail-tabs" aria-label="课程">
+          <button type="button" @click="backToCourse('resources')">资料</button>
+          <button class="active" type="button" @click="backToCourse('assignments')">作业</button>
+        </div>
       </div>
       <AssignmentDetailPanel
         :assignment="selectedAssignment"

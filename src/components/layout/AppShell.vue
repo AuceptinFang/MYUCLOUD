@@ -17,7 +17,7 @@ const emit = defineEmits(['change-view'])
   <main class="app-shell">
     <header class="app-header">
       <div>
-        <h1>CloudPost</h1>
+        <h1>UCLOUD</h1>
         <p>{{ subtitle }}</p>
       </div>
 

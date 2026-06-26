@@ -14,6 +14,7 @@
   --cloud-blue: #315f7d;
   --cloud-blue-strong: #244a64;
   --cloud-blue-soft: #eef4f7;
+  --sky: #6E9BF5;
   --paper-white: #ffffff;
   --paper-subtle: #fbfbfc;
   --ink: #172033;
@@ -416,6 +417,10 @@ p {
   color: #ffffff;
 }
 
+.detail-tabs button.active:not(:disabled):hover {
+  background: var(--cloud-blue-strong);
+}
+
 .resource-panel {
   gap: 14px;
 }
@@ -559,6 +564,7 @@ p {
   font-size: 13px;
 }
 
+
 .assignment-detail-panel {
   gap: 14px;
 }
@@ -633,12 +639,15 @@ p {
   font-size: 15px;
   font-weight: 550;
   line-height: 1.75;
-  white-space: pre-wrap;
+  white-space: normal;
   word-break: break-word;
 }
 
 .assignment-content-box p {
   margin: 0;
+  /* 覆盖祖先 .assignment-summary-main p 的 pre-wrap：
+     富文本里的制表符/前导空格不应保留成缩进 */
+  white-space: normal;
 }
 
 pre.assignment-content-box {
