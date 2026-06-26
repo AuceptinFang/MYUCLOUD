@@ -4,6 +4,7 @@ import {
   BUSINESS_AUTH,
   TENANT_ID,
   TOKEN_KEY,
+  buildPreviewUrl,
   getResourcePreviewUrl,
   pickPreviewData,
 } from '../../api/ucloud'
@@ -129,11 +130,6 @@ function getAttachmentResourceId(attachment) {
   return resource.id || resource.resourceId || ''
 }
 
-function getAttachmentExt(attachment) {
-  const resource = getAttachmentResource(attachment)
-  return resource.ext || resource.fileType || ''
-}
-
 async function previewAttachment(attachment) {
   const resourceId = getAttachmentResourceId(attachment)
   if (!resourceId) return
@@ -147,19 +143,10 @@ async function previewAttachment(attachment) {
     if (!result.ok || result.body?.code !== 200) return
 
     const { previewUrl, onlinePreview } = pickPreviewData(result.body)
+    const url = buildPreviewUrl({ previewUrl, onlinePreview })
+    if (!url) return
 
-    const params = new URLSearchParams()
-    if (onlinePreview) params.set('onlinePreview', onlinePreview)
-    if (previewUrl) params.set('previewUrl', previewUrl)
-    params.set('resourceId', resourceId)
-    const ext = getAttachmentExt(attachment)
-    if (ext) params.set('ext', ext)
-
-    window.open(
-      `https://ucloud.bupt.edu.cn/uclass/course.html#/resourceLearn?${params.toString()}`,
-      '_blank',
-      'noopener',
-    )
+    window.open(url, '_blank', 'noopener')
   } catch { /* 静默 */ }
   previewingId.value = ''
 }

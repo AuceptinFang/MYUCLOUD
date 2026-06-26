@@ -34,6 +34,22 @@ export default defineConfig({
           });
         }
       },
+      '/office': {
+        target: 'https://ucloud.bupt.edu.cn',
+        changeOrigin: true,
+        rewrite: (path) => path,
+        headers: {
+          'Origin': 'https://ucloud.bupt.edu.cn',
+          'Referer': 'https://ucloud.bupt.edu.cn/',
+        },
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq) => {
+            // OfficeWeb365 匿名即可渲染，业务鉴权头反而会被下游存储拒绝
+            proxyReq.removeHeader('Authorization');
+            proxyReq.removeHeader('Blade-Auth');
+          });
+        },
+      },
     },
   },
   resolve: {

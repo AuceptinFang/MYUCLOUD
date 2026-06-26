@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import AssignmentStatus from './AssignmentStatus.vue'
-import { BUSINESS_AUTH, TENANT_ID, TOKEN_KEY, getResourcePreviewUrl, pickPreviewData } from '../../api/ucloud'
+import { BUSINESS_AUTH, TENANT_ID, TOKEN_KEY, buildPreviewUrl, getResourcePreviewUrl, pickPreviewData } from '../../api/ucloud'
 
 const props = defineProps({
   assignment: {
@@ -9,6 +9,10 @@ const props = defineProps({
     default: null,
   },
   detail: {
+    type: Object,
+    default: null,
+  },
+  submitView: {
     type: Object,
     default: null,
   },
@@ -107,6 +111,22 @@ function getAssignmentClassName(assignment, detail) {
 
 function getAssignmentContent(assignment, detail) {
   return detail?.assignmentContent ?? assignment?.raw?.assignmentContent ?? assignment?.assignmentContent ?? ''
+}
+
+function getAssignmentComment(assignment, detail, submitView) {
+  return (
+    submitView?.assignmentComment ||
+    detail?.assignmentComment ||
+    assignment?.raw?.assignmentComment ||
+    ''
+  )
+}
+
+function hasCommentText(value) {
+  if (value === null || value === undefined) return false
+  const text = String(value).trim()
+
+  return text !== '' && text !== 'null' && text !== 'undefined' && text !== '-'
 }
 
 function formatAssignmentContent(assignment, detail) {
@@ -208,11 +228,6 @@ function getItemResourceId(item) {
   return file.id || file.resourceId || ''
 }
 
-function getItemExt(item) {
-  const file = getFileResource(item)
-  return file.ext || file.fileType || file.suffix || ''
-}
-
 async function previewResource(resource) {
   const resourceId = getItemResourceId(resource)
   if (!resourceId) return
@@ -227,18 +242,10 @@ async function previewResource(resource) {
 
     const { previewUrl, onlinePreview } = pickPreviewData(result.body)
 
-    const params = new URLSearchParams()
-    if (onlinePreview) params.set('onlinePreview', onlinePreview)
-    if (previewUrl) params.set('previewUrl', previewUrl)
-    params.set('resourceId', resourceId)
-    const ext = getItemExt(resource)
-    if (ext) params.set('ext', ext)
+    const url = buildPreviewUrl({ previewUrl, onlinePreview })
+    if (!url) return
 
-    window.open(
-      `https://ucloud.bupt.edu.cn/uclass/course.html#/resourceLearn?${params.toString()}`,
-      '_blank',
-      'noopener',
-    )
+    window.open(url, '_blank', 'noopener')
   } catch { /* 静默 */ }
   previewingId.value = ''
 }
@@ -390,6 +397,13 @@ function submitAssignment() {
           <p v-if="getAssignmentDescription(assignment, detail)">
             {{ getAssignmentDescription(assignment, detail) }}
           </p>
+          <div
+            v-if="hasCommentText(getAssignmentComment(assignment, detail, submitView))"
+            class="assignment-comment-box"
+          >
+            <span class="assignment-comment-label">教师评语</span>
+            {{ getAssignmentComment(assignment, detail, submitView) }}
+          </div>
         </div>
         <div class="assignment-summary-meta">
           <span>截止 {{ getAssignmentDeadline(assignment, detail) || '未设置' }}</span>

@@ -320,6 +320,19 @@ export function pickPreviewData(body) {
   }
 }
 
+// 把后端返回的 onlinePreview / previewUrl 拼成本站可直开的预览地址。
+// onlinePreview 形如 https://ucloud.bupt.edu.cn/office/?ssl=1&n=1&bclr=000&furl=
+// 经 Vite /office 代理转发，绕开 course.html 的强制登录与跨域。
+export function buildPreviewUrl({ previewUrl, onlinePreview } = {}) {
+  if (!previewUrl) return ''
+
+  const base = (
+    onlinePreview || 'https://ucloud.bupt.edu.cn/office/?ssl=1&n=1&bclr=000&furl='
+  ).replace('https://ucloud.bupt.edu.cn', '')
+
+  return `${base}${encodeURIComponent(previewUrl)}`
+}
+
 export async function getResourcePreviewUrl(token, resourceId) {
   const params = new URLSearchParams({ resourceId })
   const request = {
