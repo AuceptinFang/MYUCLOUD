@@ -24,7 +24,9 @@ http://127.0.0.1:5173/
 
 注意：`/api/login` 和 `/ucloud` 代理都依赖 Vite dev server。直接打开 `dist/index.html` 或只用静态托管都不能完成账号密码登录流程。
 
-页面提供两种登录方式：
+## plugin
+
+放在 src/plugin 目录下即可识别，页面右上角会增加一个链接过去的按钮
 
 ## 鉴权
 

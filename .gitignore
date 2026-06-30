@@ -46,8 +46,9 @@ ucloud-api-platform/
 ucloud-bot/
 DESIGN_SYSTEM.md
 
-# Plugins — local only, do not push
-src/plugin/
+# Plugins — auto-discovery engine is tracked; plugin dirs are local only
+src/plugin/*/
+!src/plugin/index.js
 
 # Proprietary Microsoft YaHei font — self-hosted locally, do not redistribute
 public/fonts/msyh.ttf
