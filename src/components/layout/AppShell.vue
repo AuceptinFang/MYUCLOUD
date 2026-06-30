@@ -8,6 +8,10 @@ defineProps({
     type: String,
     default: '课程与待办作业',
   },
+  plugins: {
+    type: Array,
+    default: () => [],
+  },
 })
 
 const emit = defineEmits(['change-view'])
@@ -28,6 +32,15 @@ const emit = defineEmits(['change-view'])
           @click="emit('change-view', 'study')"
         >
           首页
+        </button>
+        <button
+          v-for="p in plugins"
+          :key="p.view"
+          :class="{ active: activeView === p.view }"
+          type="button"
+          @click="emit('change-view', p.view)"
+        >
+          {{ p.name }}
         </button>
         <button
           :class="{ active: activeView === 'debug' }"

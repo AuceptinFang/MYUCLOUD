@@ -42,8 +42,12 @@ __screenshots__/
 cookies.txt
 
 ucloud/
+ucloud-api-platform/
 ucloud-bot/
 DESIGN_SYSTEM.md
+
+# Plugins — local only, do not push
+src/plugin/
 
 # Proprietary Microsoft YaHei font — self-hosted locally, do not redistribute
 public/fonts/msyh.ttf

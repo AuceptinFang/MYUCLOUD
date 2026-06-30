@@ -29,6 +29,7 @@ import CourseResourcePanel from './components/common/CourseResourcePanel.vue'
 import DeadlineList from './components/common/DeadlineList.vue'
 import DebugPanel from './components/common/DebugPanel.vue'
 import AppShell from './components/layout/AppShell.vue'
+import { usePlugins } from './plugin/index.js'
 import { normalizeAssignment, sortAssignments } from './utils/deadline'
 
 const ASSIGNMENT_FETCH_SIZE = 9999
@@ -36,6 +37,8 @@ const ASSIGNMENT_FETCH_SIZE = 9999
 const activeView = ref(getViewFromHash())
 const routeCourseId = ref(getRouteCourseId())
 const routeAssignmentId = ref(getRouteAssignmentId())
+const plugins = usePlugins()
+const pluginViews = computed(() => new Set(plugins.map((p) => p.view)))
 const username = ref('')
 const password = ref('')
 const loginUrl = ref(DEFAULT_LOGIN_URL)
@@ -107,6 +110,10 @@ function setView(view) {
     window.location.hash = '#debug'
     return
   }
+  if (pluginViews.value.has(view)) {
+    window.location.hash = `#${view}`
+    return
+  }
 
   window.location.hash = '#study'
 }
@@ -124,9 +131,11 @@ function getCourseName(course) {
 }
 
 function getViewFromHash() {
-  if (window.location.hash === '#debug') return 'debug'
-  if (window.location.hash.startsWith('#course/')) return 'course'
-  if (window.location.hash.startsWith('#assignment/')) return 'assignment'
+  const hash = window.location.hash
+  if (hash === '#debug') return 'debug'
+  if (hash.startsWith('#course/')) return 'course'
+  if (hash.startsWith('#assignment/')) return 'assignment'
+  if (hash.startsWith('#') && hash.length > 1) return hash.slice(1)
 
   return 'study'
 }
@@ -1138,7 +1147,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <AppShell :active-view="activeView" :subtitle="shellSubtitle" @change-view="setView">
+  <AppShell :active-view="activeView" :subtitle="shellSubtitle" :plugins="plugins" @change-view="setView">
     <template v-if="activeView === 'study'">
       <AuthBar
         v-model:password="password"
@@ -1254,6 +1263,13 @@ onUnmounted(() => {
         :submit-result="assignmentSubmitResult"
         :submitting="submittingAssignment"
         @submit="submitSelectedAssignment"
+      />
+    </template>
+
+    <template v-else-if="pluginViews.has(activeView)">
+      <component
+        :is="plugins.find(p => p.view === activeView)?.component"
+        v-if="plugins.find(p => p.view === activeView)"
       />
     </template>
 
