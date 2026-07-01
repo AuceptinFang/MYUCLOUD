@@ -226,12 +226,83 @@ async function jwglPost(path, data, cookies, referer) {
   return { status: resp.status, body: respBody, cookies: resultCookies }
 }
 
+// ── course list fetcher ────────────────────────────────────────────────────
+
+function parseCourseList(listHtml) {
+  // Parse <th> headers to find column indices
+  const headMatch = listHtml.match(/<thead[^>]*>([\s\S]*?)<\/thead\s*>/i) || ['']
+  const thead = headMatch[1] || ''
+  const thCells = []
+  const thRe = /<th\b[^>]*>([\s\S]*?)<\/th\s*>/gi
+  for (const m of thead.matchAll(thRe)) {
+    thCells.push(m[1].replace(/<[^>]+>/g, '').trim())
+  }
+  // fallback: look for first tr with th
+  if (thCells.length === 0) {
+    const firstThRow = listHtml.match(/<tr\b[^>]*>([\s\S]*?)<\/tr\s*>/i)
+    if (firstThRow) {
+      for (const m of firstThRow[1].matchAll(/<th\b[^>]*>([\s\S]*?)<\/th\s*>/gi)) {
+        thCells.push(m[1].replace(/<[^>]+>/g, '').trim())
+      }
+    }
+  }
+  // default column map
+  const colIdx = {
+    xh: thCells.findIndex(c => c.includes('序号')),
+    code: thCells.findIndex(c => c.includes('课程编号') || c.includes('课程代码')),
+    name: thCells.findIndex(c => c.includes('课程名称')),
+    teacher: thCells.findIndex(c => c.includes('教师') || c.includes('任课教师') || c.includes('授课教师')),
+  }
+
+  // Parse data rows
+  const courses = []
+  const trRe = /<tr\b[^>]*>([\s\S]*?)<\/tr\s*>/gi
+  for (const m of listHtml.matchAll(trRe)) {
+    const rowHtml = m[1]
+    // skip header rows
+    if (/<th\b/i.test(rowHtml)) continue
+    // must contain an edit link
+    const hrefMatch = rowHtml.match(/href\s*=\s*["']([^"']*xspj_edit\.do[^"']*)["']/i)
+    if (!hrefMatch) continue
+    const editLink = hrefMatch[1].replace(/&amp;/g, '&')
+
+    const cells = []
+    const tdRe = /<td\b[^>]*>([\s\S]*?)<\/td\s*>/gi
+    for (const td of rowHtml.matchAll(tdRe)) {
+      cells.push(td[1].replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim())
+    }
+
+    const courseName = colIdx.name >= 0 ? (cells[colIdx.name] || '') : (cells[2] || '')
+    const teacherName = colIdx.teacher >= 0 ? (cells[colIdx.teacher] || '') : ''
+
+    courses.push({ editLink, courseName, teacherName })
+  }
+
+  log('courses:parse', { headers: thCells, colIdx, parsedN: courses.length, first: courses[0] })
+  return courses
+}
+
+async function fetchCourses(cookies) {
+  const findResp = await jwglGet('/jsxsd/xspj/xspj_find.do', cookies)
+  const batchLinks = parseLinks(findResp.body, '/jsxsd/xspj/xspj_list.do')
+  if (batchLinks.length === 0) return []
+
+  // All batch pages return the same course list. Just parse the first one.
+  const firstBatch = batchLinks[0]
+  const listResp = await jwglGet(firstBatch, cookies, JWGL_BASE + '/jsxsd/xspj/xspj_find.do')
+  const allCourses = parseCourseList(listResp.body).map(c => ({
+    ...c,
+    batchIndex: 0,
+    batchLink: firstBatch,
+  }))
+
+  log('courses:result', { total: allCourses.length, sample: allCourses.slice(0, 2).map(c => ({ name: c.courseName, teacher: c.teacherName })) })
+  return allCourses
+}
+
 // ── evaluation runner (async generator) ────────────────────────────────────
 
-async function* runEvaluation(cookies, degree, comment, doSubmit) {
-  // step 1: get batch links
-  yield { type: 'step', step: 'batches', message: '正在获取评教批次…' }
-
+async function* runEvaluation(cookies, degree, comment, doSubmit, selectedEditLinks) {
   const findResp = await jwglGet('/jsxsd/xspj/xspj_find.do', cookies)
   const batchLinks = parseLinks(findResp.body, '/jsxsd/xspj/xspj_list.do')
 
@@ -240,29 +311,44 @@ async function* runEvaluation(cookies, degree, comment, doSubmit) {
     return
   }
 
-  let totalSaved = 0
-  let totalCourses = 0
-
-  // count total courses first for progress reporting
-  let allEditLinks = []
+  // build full course list, then filter if needed
+  let allCourses = []
   for (const batchLink of batchLinks) {
     const listResp = await jwglGet(batchLink, cookies, JWGL_BASE + '/jsxsd/xspj/xspj_find.do')
     const editLinks = parseLinks(listResp.body, '/jsxsd/xspj/xspj_edit.do')
-    allEditLinks.push({ batchLink, editLinks, listBody: listResp.body })
-    totalCourses += editLinks.length
+    allCourses.push({ batchLink, editLinks, listBody: listResp.body })
   }
 
+  // filter to selected courses
+  const selectedSet = selectedEditLinks ? new Set(selectedEditLinks) : null
+  if (selectedSet) {
+    allCourses = allCourses
+      .map(({ batchLink, editLinks, listBody }) => ({
+        batchLink,
+        listBody,
+        editLinks: editLinks.filter((link) => selectedSet.has(link)),
+      }))
+      .filter(({ editLinks }) => editLinks.length > 0)
+  }
+
+  const totalCourses = allCourses.reduce((sum, c) => sum + c.editLinks.length, 0)
+  if (totalCourses === 0) {
+    yield { type: 'done', totalSaved: 0, totalBatches: allCourses.length, message: '没有选中的课程' }
+    return
+  }
+
+  let totalSaved = 0
   let courseIndex = 0
 
-  for (let bi = 0; bi < batchLinks.length; bi++) {
-    const { batchLink, editLinks, listBody } = allEditLinks[bi]
+  for (let bi = 0; bi < allCourses.length; bi++) {
+    const { batchLink, editLinks, listBody } = allCourses[bi]
 
     yield {
       type: 'step',
       step: 'courses',
       batch: bi + 1,
-      totalBatches: batchLinks.length,
-      message: `批次 ${bi + 1}/${batchLinks.length}：共 ${editLinks.length} 门课程`,
+      totalBatches: allCourses.length,
+      message: `批次：共 ${editLinks.length} 门课程`,
     }
 
     for (const editLink of editLinks) {
@@ -365,10 +451,10 @@ async function* runEvaluation(cookies, degree, comment, doSubmit) {
   }
 
   const msg = doSubmit
-    ? `评价完成：共评价并提交 ${totalSaved} 门课程，${batchLinks.length} 个批次`
+    ? `评价完成：共评价并提交 ${totalSaved} 门课程，${allCourses.length} 个批次`
     : `评价完成：共保存 ${totalSaved} 门课程评价，请手动登录教务系统提交`
 
-  yield { type: 'done', totalSaved, totalBatches: batchLinks.length, message: msg }
+  yield { type: 'done', totalSaved, totalBatches: allCourses.length, message: msg }
 }
 
 // ── request body parser ────────────────────────────────────────────────────
@@ -456,7 +542,7 @@ async function handleLogin(req, res) {
 async function handleEvaluate(req, res) {
   try {
     const body = await readRequestBody(req)
-    const { sessionId, degree, comment = '', submit = false } = body
+    const { sessionId, degree, comment = '', submit = false, selectedCourses } = body
 
     if (!sessionId) {
       sendJson(res, 400, { success: false, msg: '缺少 sessionId' })
@@ -475,7 +561,7 @@ async function handleEvaluate(req, res) {
       return
     }
 
-    log('handleEvaluate:start', { sessionId, degree: degreeNum, hasComment: Boolean(comment), submit })
+    log('handleEvaluate:start', { sessionId, degree: degreeNum, hasComment: Boolean(comment), submit, selectedN: selectedCourses?.length })
 
     // SSE headers
     res.statusCode = 200
@@ -485,7 +571,7 @@ async function handleEvaluate(req, res) {
     res.setHeader('X-Accel-Buffering', 'no')
 
     try {
-      for await (const event of runEvaluation(session.cookies, degreeNum, comment, submit)) {
+      for await (const event of runEvaluation(session.cookies, degreeNum, comment, submit, selectedCourses)) {
         res.write('data: ' + JSON.stringify(event) + '\n\n')
       }
     } catch (err) {
@@ -518,6 +604,22 @@ export function jwglPlugin() {
           return
         }
         handleLogin(req, res)
+      })
+
+      server.middlewares.use('/api/jwgl/courses', async (req, res, next) => {
+        if (req.method !== 'POST') { next(); return }
+        try {
+          const body = await readRequestBody(req)
+          const { sessionId } = body
+          if (!sessionId) { sendJson(res, 400, { success: false, msg: '缺少 sessionId' }); return }
+          const session = getSession(sessionId)
+          if (!session) { sendJson(res, 401, { success: false, msg: '会话已过期' }); return }
+          const courses = await fetchCourses(session.cookies)
+          sendJson(res, 200, { success: true, courses })
+        } catch (e) {
+          log('courses:error', { message: e.message })
+          sendJson(res, 500, { success: false, msg: e.message })
+        }
       })
 
       server.middlewares.use('/api/jwgl/evaluate', (req, res, next) => {
