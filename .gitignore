@@ -49,6 +49,10 @@ DESIGN_SYSTEM.md
 # Plugins — auto-discovery engine is tracked; plugin dirs are local only
 src/plugin/*/
 !src/plugin/index.js
+!src/plugin/jwgl-eval/
 
 # Proprietary Microsoft YaHei font — self-hosted locally, do not redistribute
 public/fonts/msyh.ttf
+
+# Reference scripts, not part of the app
+bupt-jwgl/

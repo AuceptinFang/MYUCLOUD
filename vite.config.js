@@ -4,11 +4,13 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 import { ucloudAuthPlugin } from './vite.ucloud-auth.js'
+import { jwglPlugin } from './vite.jwgl.js'
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
     ucloudAuthPlugin(),
+    jwglPlugin(),
     vue(),
     vueDevTools(),
   ],
@@ -33,6 +35,16 @@ export default defineConfig({
             proxyReq.removeHeader('Authorization');
           });
         }
+      },
+      '/jwgl': {
+        target: 'https://jwgl.bupt.edu.cn',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (path) => path.replace(/^\/jwgl/, ''),
+        headers: {
+          Origin: 'https://jwgl.bupt.edu.cn',
+          Referer: 'https://jwgl.bupt.edu.cn/',
+        },
       },
       '/office': {
         target: 'https://ucloud.bupt.edu.cn',
