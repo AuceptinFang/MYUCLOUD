@@ -52,6 +52,12 @@ const selectedCount = computed(() => selectedSet.value.size)
 const loggedIn = computed(() => Boolean(sessionId.value))
 const hasCourses = computed(() => courses.value.length > 0)
 const hasSteps = computed(() => steps.value.length > 0)
+const progressPct = computed(() => {
+  const done = steps.value.filter(s => s.type === 'course' || s.type === 'course-error').length
+  if (done === 0) return 0
+  const total = steps.value.find(s => s.type === 'course')?.totalCourses || done
+  return Math.round((done / total) * 100)
+})
 // 教务规则：超过90分必填亮点，低于80分必填改进建议
 const needGood = computed(() => targetScore.value > 90)
 const needImprove = computed(() => targetScore.value < 80)
@@ -128,6 +134,7 @@ function toggleCourse(editLink) {
 
 async function doEvaluate() {
   if (!canEvaluate.value) return
+  console.log('[eval] sending', { targetScore: targetScore.value, comment: commentGood.value, commentImprove: commentImprove.value })
   steps.value = []
   evalError.value = ''
   evalResult.value = null
@@ -173,22 +180,21 @@ async function doEvaluate() {
 }
 
 async function doSubmitAll() {
-  if (!canEvaluate.value) return
+  const unevaluated = courses.value.filter(c => c.evaluated !== '是')
+  if (unevaluated.length > 0) {
+    evalError.value = `还有 ${unevaluated.length} 门课未评价，请先完成所有评价后再提交`
+    return
+  }
   steps.value = []
   evalError.value = ''
   evalResult.value = null
   evaluating.value = true
   try {
-    const resp = await fetch('/api/jwgl/evaluate', {
+    const resp = await fetch('/api/jwgl/submit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         sessionId: sessionId.value,
-        targetScore: targetScore.value,
-        comment: commentGood.value,
-        commentImprove: commentImprove.value,
-        submit: true,
-        selectedCourses: [...selectedSet.value],
       }),
     })
     if (!resp.ok) { const d = await resp.json(); evalError.value = d.msg || `HTTP ${resp.status}`; return }
@@ -264,7 +270,7 @@ function stepIcon(step) {
         </button>
         <button
           v-if="loggedIn"
-          :disabled="!canEvaluate"
+          :disabled="evaluating"
           class="button-primary"
           type="button"
           @click="doSubmitAll"
@@ -351,7 +357,7 @@ function stepIcon(step) {
             {{ evaluating ? '处理中…' : submitDisabled ? submitDisabled : `评价 (${selectedCount})` }}
           </button>
           <button
-            :disabled="!canEvaluate"
+            :disabled="evaluating"
             class="button-primary"
             type="button"
             @click="doSubmitAll"
@@ -366,16 +372,28 @@ function stepIcon(step) {
         <div v-if="hasSteps || evaluating || evalDone || evalError" class="eval-overlay" @click.self="resetEval">
           <div class="eval-toast">
             <div class="eval-toast-header">
-              <strong>{{ evaluating ? '评教中…' : evalDone ? '评教完成' : evalError ? '评教出错' : '评教进度' }}</strong>
+              <div style="display:flex;align-items:center;gap:10px">
+                <span v-if="evaluating" class="eval-spinner"></span>
+                <strong>{{ evaluating ? '评教中…' : evalDone ? '评教完成' : evalError ? '评教出错' : '评教进度' }}</strong>
+              </div>
               <button v-if="!evaluating" class="eval-toast-close" @click="resetEval">✕</button>
+            </div>
+            <div v-if="evaluating" class="eval-progress-bar">
+              <div class="eval-progress-fill" :style="{ width: progressPct + '%' }"></div>
             </div>
             <div class="eval-toast-body">
               <div v-for="(step, i) in steps" :key="i" class="eval-toast-step" :class="{ error: step.type === 'course-error' }">
-                {{ stepIcon(step) }} {{ step.message }}
+                <span class="eval-step-icon">{{ stepIcon(step) }}</span> {{ step.message }}
               </div>
-              <div v-if="evaluating" class="eval-toast-step muted">⟳ 处理中…</div>
-              <div v-if="evalDone" class="eval-toast-step success">✓ {{ evalResult.message }}</div>
-              <div v-if="evalError" class="eval-toast-step error">✕ {{ evalError }}</div>
+              <div v-if="evaluating" class="eval-toast-step loading">
+                <span class="eval-step-icon eval-pulse">⟳</span> 处理中…
+              </div>
+              <div v-if="evalDone" class="eval-toast-step success">
+                <span class="eval-step-icon">✓</span> {{ evalResult.message }}
+              </div>
+              <div v-if="evalError" class="eval-toast-step error">
+                <span class="eval-step-icon">✕</span> {{ evalError }}
+              </div>
             </div>
           </div>
         </div>
@@ -421,9 +439,26 @@ function stepIcon(step) {
   max-height: 50vh; overflow-y: auto;
 }
 .eval-toast-step {
-  font-size: 13px; line-height: 1.5;
+  font-size: 13px; line-height: 1.5; display: flex; align-items: center; gap: 6px;
 }
-.eval-toast-step.muted { color: #999; }
+.eval-step-icon { width: 18px; text-align: center; flex-shrink: 0; }
+.eval-toast-step.loading { color: var(--cloud-blue); }
 .eval-toast-step.success { color: #228760; font-weight: 650; }
 .eval-toast-step.error { color: #c84444; font-weight: 650; }
+.eval-spinner {
+  width: 18px; height: 18px; border: 2px solid #e6e8ee;
+  border-top-color: var(--cloud-blue); border-radius: 50%;
+  animation: eval-spin 0.6s linear infinite;
+}
+@keyframes eval-spin { to { transform: rotate(360deg); } }
+.eval-pulse { animation: eval-pulse-anim 1s ease-in-out infinite; }
+@keyframes eval-pulse-anim { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.eval-progress-bar {
+  height: 3px; background: #e6e8ee; margin: 0 18px;
+  border-radius: 2px; overflow: hidden;
+}
+.eval-progress-fill {
+  height: 100%; background: var(--cloud-blue);
+  border-radius: 2px; transition: width 0.3s ease;
+}
 </style>

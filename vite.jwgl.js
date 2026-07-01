@@ -340,8 +340,8 @@ async function jwglPost(path, data, cookies, referer) {
     Referer: referer || JWGL_BASE + '/jsxsd/',
   })
   const body = new URLSearchParams(data).toString()
-  const jynrValues = data.filter(([k]) => k === 'jynr').map(([, v]) => v)
-  log('jwgl:post', { url, bodyLen: body.length, jynr: jynrValues, hasCookies: Boolean(cookies && cookies.trim()) })
+  const textareaData = data.filter(([k]) => !k.startsWith('pj06') && k !== 'zgpyids' && k !== 'issubmit' && k !== 'sfxyt' && k !== 'sava')
+  log('jwgl:post', { url, textareaData, hasCookies: Boolean(cookies && cookies.trim()) })
   const resp = await fetch(url, { method: 'POST', headers, body })
   const respBody = await resp.text()
   const newCookies = parseSetCookies(resp)
@@ -434,7 +434,7 @@ async function fetchCourses(cookies) {
 
 // ── evaluation runner (async generator) ────────────────────────────────────
 
-async function* runEvaluation(cookies, targetScore, comment, commentImprove, doSubmit, selectedEditLinks) {
+async function* runEvaluation(cookies, targetScore, comment, commentImprove, selectedEditLinks) {
   if (!selectedEditLinks || selectedEditLinks.length === 0) {
     yield { type: 'done', totalSaved: 0, totalBatches: 0, message: '没有选中的课程' }
     return
@@ -468,10 +468,10 @@ async function* runEvaluation(cookies, targetScore, comment, commentImprove, doS
 
       data.push(...generatePreciseEvaluation(form, targetScore))
 
-      // 教务表单 textarea 顺序：第1个=亮点，第2个=改进建议
+      // 教务表单 textarea 顺序：第1个=改进建议，第2个=亮点
       log('evaluate:textareas', { names: form.textareas, comment, commentImprove })
-      if (form.textareas.length > 0) data.push([form.textareas[0], comment])
-      if (form.textareas.length > 1) data.push([form.textareas[1], commentImprove])
+      if (form.textareas.length > 0) data.push([form.textareas[0], commentImprove])
+      if (form.textareas.length > 1) data.push([form.textareas[1], comment])
       else if (form.textareas.length === 0) {
         yield { type: 'course-error', courseIndex: i + 1, message: '未找到评语输入框，表单结构可能已变更' }
         continue
@@ -501,44 +501,42 @@ async function* runEvaluation(cookies, targetScore, comment, commentImprove, doS
     }
   }
 
-  // submit all batches if requested
-  if (doSubmit) {
-    yield { type: 'step', step: 'submit', message: '正在提交…' }
-    try {
-      const findResp = await jwglGet('/jsxsd/xspj/xspj_find.do', cookies)
-      cookies = findResp.cookies
-      const batchLinks = parseLinks(findResp.body, '/jsxsd/xspj/xspj_list.do')
+  yield { type: 'done', totalSaved, message: `评价完成：共保存 ${totalSaved} 门课程评价` }
+}
 
-      for (const batchLink of batchLinks) {
-        const listResp = await jwglGet(batchLink, cookies, JWGL_BASE + '/jsxsd/xspj/xspj_find.do')
-        cookies = listResp.cookies
-        const listForm = parseEvalForm(listResp.body)
+// ── submit runner (async generator) ──────────────────────────────────────────
 
-        let pj01id = ''
-        for (const [name, value] of listForm.fields) {
-          if (name === 'pj01id' && value) { pj01id = value; break }
-        }
+async function* runSubmit(cookies) {
+  yield { type: 'step', step: 'submit', message: '正在提交…' }
+  try {
+    const findResp = await jwglGet('/jsxsd/xspj/xspj_find.do', cookies)
+    cookies = findResp.cookies
+    const batchLinks = parseLinks(findResp.body, '/jsxsd/xspj/xspj_list.do')
 
-        if (pj01id) {
-          await jwglPost(
-            `/jsxsd/xspj/xspj_yjtj.do?pj01id=${encodeURIComponent(pj01id)}`,
-            listForm.fields,
-            cookies,
-            JWGL_BASE + batchLink,
-          )
-          yield { type: 'step', step: 'submitted', message: '已提交' }
-        }
+    for (const batchLink of batchLinks) {
+      const listResp = await jwglGet(batchLink, cookies, JWGL_BASE + '/jsxsd/xspj/xspj_find.do')
+      cookies = listResp.cookies
+      const listForm = parseEvalForm(listResp.body)
+
+      let pj01id = ''
+      for (const [name, value] of listForm.fields) {
+        if (name === 'pj01id' && value) { pj01id = value; break }
       }
-    } catch (err) {
-      yield { type: 'step', step: 'submit-error', message: `提交失败: ${err.message}` }
+
+      if (pj01id) {
+        await jwglPost(
+          `/jsxsd/xspj/xspj_yjtj.do?pj01id=${encodeURIComponent(pj01id)}`,
+          listForm.fields,
+          cookies,
+          JWGL_BASE + batchLink,
+        )
+        yield { type: 'step', step: 'submitted', message: '已提交' }
+      }
     }
+  } catch (err) {
+    yield { type: 'step', step: 'submit-error', message: `提交失败: ${err.message}` }
   }
-
-  const msg = doSubmit
-    ? `评价完成：共评价并提交 ${totalSaved} 门课程`
-    : `评价完成：共保存 ${totalSaved} 门课程评价`
-
-  yield { type: 'done', totalSaved, message: msg }
+  yield { type: 'done', totalSaved: 0, message: '提交完成' }
 }
 
 // ── request body parser ────────────────────────────────────────────────────
@@ -627,7 +625,7 @@ async function handleLogin(req, res) {
 async function handleEvaluate(req, res) {
   try {
     const body = await readRequestBody(req)
-    const { sessionId, targetScore, comment = '', commentImprove = '', submit = false, selectedCourses } = body
+    const { sessionId, targetScore, comment = '', commentImprove = '', selectedCourses } = body
 
     if (!sessionId) {
       sendJson(res, 400, { success: false, msg: '缺少 sessionId' })
@@ -646,7 +644,7 @@ async function handleEvaluate(req, res) {
       return
     }
 
-    log('handleEvaluate:start', { sessionId, targetScore: scoreNum, hasComment: Boolean(comment), hasImprove: Boolean(commentImprove), submit, selectedN: selectedCourses?.length })
+    log('handleEvaluate:start', { sessionId, targetScore: scoreNum, hasComment: Boolean(comment), hasImprove: Boolean(commentImprove), selectedN: selectedCourses?.length })
 
     // SSE headers
     res.statusCode = 200
@@ -656,7 +654,7 @@ async function handleEvaluate(req, res) {
     res.setHeader('X-Accel-Buffering', 'no')
 
     try {
-      for await (const event of runEvaluation(session.cookies, scoreNum, comment, commentImprove, submit, selectedCourses)) {
+      for await (const event of runEvaluation(session.cookies, scoreNum, comment, commentImprove, selectedCourses)) {
         res.write('data: ' + JSON.stringify(event) + '\n\n')
       }
     } catch (err) {
@@ -670,6 +668,51 @@ async function handleEvaluate(req, res) {
     // if headers haven't been sent yet (e.g. invalid JSON body)
     if (!res.headersSent) {
       sendJson(res, 500, { success: false, msg: error.message || '评教失败' })
+    } else {
+      res.write('data: ' + JSON.stringify({ type: 'error', message: error.message }) + '\n\n')
+      res.end()
+    }
+  }
+}
+
+async function handleSubmit(req, res) {
+  try {
+    const body = await readRequestBody(req)
+    const { sessionId } = body
+
+    if (!sessionId) {
+      sendJson(res, 400, { success: false, msg: '缺少 sessionId' })
+      return
+    }
+
+    const session = getSession(sessionId)
+    if (!session) {
+      sendJson(res, 401, { success: false, msg: '会话已过期，请重新登录' })
+      return
+    }
+
+    log('handleSubmit:start', { sessionId })
+
+    res.statusCode = 200
+    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8')
+    res.setHeader('Cache-Control', 'no-cache')
+    res.setHeader('Connection', 'keep-alive')
+    res.setHeader('X-Accel-Buffering', 'no')
+
+    try {
+      for await (const event of runSubmit(session.cookies)) {
+        res.write('data: ' + JSON.stringify(event) + '\n\n')
+      }
+    } catch (err) {
+      log('handleSubmit:stream:error', { message: err.message })
+      res.write('data: ' + JSON.stringify({ type: 'error', message: err.message }) + '\n\n')
+    }
+
+    res.end()
+  } catch (error) {
+    log('handleSubmit:error', { message: error.message })
+    if (!res.headersSent) {
+      sendJson(res, 500, { success: false, msg: error.message || '提交失败' })
     } else {
       res.write('data: ' + JSON.stringify({ type: 'error', message: error.message }) + '\n\n')
       res.end()
@@ -714,6 +757,14 @@ export function jwglPlugin() {
           return
         }
         handleEvaluate(req, res)
+      })
+
+      server.middlewares.use('/api/jwgl/submit', (req, res, next) => {
+        if (req.method !== 'POST') {
+          next()
+          return
+        }
+        handleSubmit(req, res)
       })
     },
   }
