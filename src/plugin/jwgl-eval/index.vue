@@ -27,7 +27,6 @@ const password = ref(saved.password || '')
 const targetScore = ref(85)
 const commentGood = ref('')
 const commentImprove = ref('')
-const submit = ref(false)
 const sessionId = ref('')
 
 const loggingIn = ref(false)
@@ -42,10 +41,11 @@ const evalResult = ref(null)
 const courses = ref([])
 const selectedSet = ref(new Set())
 
+const unevaluatedCourses = computed(() => courses.value.filter(c => c.evaluated !== '是'))
 const allSelected = computed({
-  get: () => courses.value.length > 0 && selectedSet.value.size === courses.value.length,
+  get: () => unevaluatedCourses.value.length > 0 && unevaluatedCourses.value.every(c => selectedSet.value.has(c.editLink)),
   set: (v) => {
-    selectedSet.value = v ? new Set(courses.value.map((c) => c.editLink)) : new Set()
+    selectedSet.value = v ? new Set(unevaluatedCourses.value.map((c) => c.editLink)) : new Set()
   },
 })
 const selectedCount = computed(() => selectedSet.value.size)
@@ -109,8 +109,8 @@ async function doLoadCourses() {
     const data = await resp.json()
     if (!data.success) { coursesError.value = data.msg || '获取课程失败'; return }
     courses.value = data.courses || []
-    // auto-select all courses
-    selectedSet.value = new Set(courses.value.map((c) => c.editLink))
+    // auto-select unevaluated courses
+    selectedSet.value = new Set(courses.value.filter(c => c.evaluated !== '是').map((c) => c.editLink))
   } catch (e) {
     coursesError.value = e.message || '网络错误'
   } finally {
@@ -141,7 +141,7 @@ async function doEvaluate() {
         targetScore: targetScore.value,
         comment: commentGood.value,
         commentImprove: commentImprove.value,
-        submit: submit.value,
+        submit: false,
         selectedCourses: [...selectedSet.value],
       }),
     })
@@ -160,7 +160,53 @@ async function doEvaluate() {
         try {
           const e = JSON.parse(line.slice(6))
           if (e.type === 'error') { evalError.value = e.message; return }
-          if (e.type === 'done') { evalResult.value = e; return }
+          if (e.type === 'done') { evalResult.value = e; doLoadCourses(); return }
+          steps.value.push(e)
+        } catch { /* skip */ }
+      }
+    }
+  } catch (e) {
+    evalError.value = e.message || '网络错误'
+  } finally {
+    evaluating.value = false
+  }
+}
+
+async function doSubmitAll() {
+  if (!canEvaluate.value) return
+  steps.value = []
+  evalError.value = ''
+  evalResult.value = null
+  evaluating.value = true
+  try {
+    const resp = await fetch('/api/jwgl/evaluate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: sessionId.value,
+        targetScore: targetScore.value,
+        comment: commentGood.value,
+        commentImprove: commentImprove.value,
+        submit: true,
+        selectedCourses: [...selectedSet.value],
+      }),
+    })
+    if (!resp.ok) { const d = await resp.json(); evalError.value = d.msg || `HTTP ${resp.status}`; return }
+    const reader = resp.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue
+        try {
+          const e = JSON.parse(line.slice(6))
+          if (e.type === 'error') { evalError.value = e.message; return }
+          if (e.type === 'done') { evalResult.value = e; doLoadCourses(); return }
           steps.value.push(e)
         } catch { /* skip */ }
       }
@@ -214,7 +260,16 @@ function stepIcon(step) {
           type="button"
           @click="doEvaluate"
         >
-          {{ evaluating ? '提交中…' : submitDisabled ? submitDisabled : `提交 (${selectedCount})` }}
+          {{ evaluating ? '处理中…' : submitDisabled ? submitDisabled : `评价 (${selectedCount})` }}
+        </button>
+        <button
+          v-if="loggedIn"
+          :disabled="!canEvaluate"
+          class="button-primary"
+          type="button"
+          @click="doSubmitAll"
+        >
+          提交
         </button>
         <button v-if="loggedIn" class="button-secondary" type="button" @click="doLogout">退出</button>
       </div>
@@ -240,7 +295,7 @@ function stepIcon(step) {
       <div v-if="hasCourses" class="panel" style="margin-top:12px">
         <label class="check-control">
           <input v-model="allSelected" type="checkbox" />
-          全选 / 取消全选（共 {{ courses.length }} 门）
+          选择全部未评分（{{ unevaluatedCourses.length }}/{{ courses.length }} 门）
         </label>
         <div
           v-for="(c, i) in courses"
@@ -286,10 +341,24 @@ function stepIcon(step) {
           需要改进的地方
           <textarea v-model="commentImprove" :placeholder="needImprove ? '<80 分时必填' : '需要改进的地方（可选）'" />
         </label>
-        <label class="check-control">
-          <input v-model="submit" type="checkbox" />
-          保存后统一提交
-        </label>
+        <div style="display:flex;justify-content:flex-end;gap:8px">
+          <button
+            :disabled="!canEvaluate"
+            class="button-primary"
+            type="button"
+            @click="doEvaluate"
+          >
+            {{ evaluating ? '处理中…' : submitDisabled ? submitDisabled : `评价 (${selectedCount})` }}
+          </button>
+          <button
+            :disabled="!canEvaluate"
+            class="button-primary"
+            type="button"
+            @click="doSubmitAll"
+          >
+            提交
+          </button>
+        </div>
       </div>
 
       <!-- 评教进度浮窗 -->

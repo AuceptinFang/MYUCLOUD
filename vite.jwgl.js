@@ -340,7 +340,8 @@ async function jwglPost(path, data, cookies, referer) {
     Referer: referer || JWGL_BASE + '/jsxsd/',
   })
   const body = new URLSearchParams(data).toString()
-  log('jwgl:post', { url, bodyLen: body.length, hasCookies: Boolean(cookies && cookies.trim()) })
+  const jynrValues = data.filter(([k]) => k === 'jynr').map(([, v]) => v)
+  log('jwgl:post', { url, bodyLen: body.length, jynr: jynrValues, hasCookies: Boolean(cookies && cookies.trim()) })
   const resp = await fetch(url, { method: 'POST', headers, body })
   const respBody = await resp.text()
   const newCookies = parseSetCookies(resp)
