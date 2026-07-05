@@ -60,7 +60,7 @@ const progressPct = computed(() => {
 })
 // 教务规则：超过90分必填亮点，低于80分必填改进建议
 const needGood = computed(() => targetScore.value > 90)
-const needImprove = computed(() => targetScore.value < 80)
+const needImprove = computed(() => targetScore.value < 81)
 const canEvaluate = computed(() => {
   if (!hasCourses.value || selectedCount.value === 0) return false
   if (needGood.value && !commentGood.value.trim()) return false
@@ -341,11 +341,11 @@ function stepIcon(step) {
         </label>
         <label>
           工作中的亮点
-          <textarea v-model="commentGood" :placeholder="needGood ? '>90 分时必填' : '任课教师在教学工作中的亮点（可选）'" />
+          <textarea v-model="commentGood" :placeholder="needGood ? '>=90 分时必填' : '任课教师在教学工作中的亮点（可选）'" />
         </label>
         <label>
           需要改进的地方
-          <textarea v-model="commentImprove" :placeholder="needImprove ? '<80 分时必填' : '需要改进的地方（可选）'" />
+          <textarea v-model="commentImprove" :placeholder="needImprove ? '<=80 分时必填' : '需要改进的地方（可选）'" />
         </label>
         <div style="display:flex;justify-content:flex-end;gap:8px">
           <button

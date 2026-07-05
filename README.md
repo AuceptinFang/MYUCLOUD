@@ -24,6 +24,18 @@ http://127.0.0.1:5173/
 
 注意：`/api/login` 和 `/ucloud` 代理都依赖 Vite dev server。直接打开 `dist/index.html` 或只用静态托管都不能完成账号密码登录流程。
 
+## Docker（调试模式）
+
+容器内运行 Vite dev server，源码通过挂载同步，**改代码自动热更新，无需重启**。仅用于本地调试，非生产部署。
+
+```sh
+docker compose up -d        # 启动，访问 http://localhost:5173/
+docker compose logs -f      # 查看日志
+docker compose down         # 停止
+```
+
+改 `package.json` 增减依赖时需重建：`docker compose up -d --build`。
+
 ## plugin
 
 放在 src/plugin 目录下即可识别，页面右上角会增加一个链接过去的按钮
