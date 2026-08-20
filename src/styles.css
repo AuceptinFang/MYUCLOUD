@@ -139,10 +139,10 @@ p {
   min-height: 60px;
 }
 
-.app-header h1 {
-  font-size: 25px;
-  letter-spacing: 0;
-  line-height: 1.2;
+.app-brand {
+  display: grid;
+  gap: 1px;
+  justify-items: start;
 }
 
 .app-header p,

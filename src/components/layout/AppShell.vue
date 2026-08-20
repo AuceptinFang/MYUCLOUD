@@ -1,4 +1,6 @@
 <script setup>
+import UcloudCreatures from '../common/UcloudCreatures.vue'
+
 defineProps({
   activeView: {
     type: String,
@@ -20,8 +22,8 @@ const emit = defineEmits(['change-view'])
 <template>
   <main class="app-shell">
     <header class="app-header">
-      <div>
-        <h1>UCLOUD</h1>
+      <div class="app-brand">
+        <UcloudCreatures />
         <p>{{ subtitle }}</p>
       </div>
 
