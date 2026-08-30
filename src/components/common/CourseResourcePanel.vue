@@ -187,18 +187,34 @@ async function downloadAttachment(attachment) {
   <section class="section-block resource-panel">
     <div class="section-header">
       <div>
-        <h2>{{ course ? getCourseName(course) : '课程资料' }}</h2>
-        <p>{{ course ? '资料' : '选择课程后显示资料' }}</p>
+        <h2>课程资料</h2>
+        <p>{{ course ? `按课程结构浏览 · ${getCourseName(course)}` : '选择课程后显示资料' }}</p>
       </div>
       <span v-if="course" class="section-count">{{ resourceCount }}</span>
     </div>
 
-    <div v-if="!course" class="empty-state">选择课程后显示资料</div>
-    <div v-else-if="loading" class="empty-state">正在读取资料</div>
+    <div v-if="!course" class="empty-state empty-state-card">
+      <span class="empty-cloud" aria-hidden="true"><i /><i /></span>
+      <strong>尚未选择课程</strong>
+      <p>从首页进入一门课程后即可浏览资料</p>
+    </div>
+    <div v-else-if="loading" class="skeleton-list" aria-label="正在读取资料">
+      <div v-for="index in 4" :key="index" class="skeleton-row">
+        <div>
+          <i class="skeleton-line" />
+          <i class="skeleton-line skeleton-line-short" />
+        </div>
+        <i class="skeleton-chip" />
+      </div>
+    </div>
     <section v-else-if="error" class="notice error">
       {{ error }}
     </section>
-    <div v-else-if="flattenedResources.length === 0" class="empty-state">暂无课程资料</div>
+    <div v-else-if="flattenedResources.length === 0" class="empty-state empty-state-card">
+      <span class="empty-cloud" aria-hidden="true"><i /><i /></span>
+      <strong>暂无课程资料</strong>
+      <p>教师发布的课件与附件会显示在这里</p>
+    </div>
 
     <div v-else class="resource-list">
       <div

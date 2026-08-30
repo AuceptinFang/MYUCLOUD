@@ -1,7 +1,8 @@
 <script setup>
+import { computed } from 'vue'
 import AssignmentStatus from './AssignmentStatus.vue'
 
-defineProps({
+const props = defineProps({
   assignments: {
     type: Array,
     default: () => [],
@@ -58,6 +59,49 @@ defineProps({
 
 const emit = defineEmits(['update:includeCompleted', 'update:pageSize', 'select'])
 
+const pageSizeOptions = computed(() =>
+  [...new Set([10, 20, 50, 100, Number(props.pageSize)])]
+    .filter((value) => Number.isFinite(value) && value > 0)
+    .sort((left, right) => left - right),
+)
+
+const assignmentGroups = computed(() => {
+  const groups = [
+    {
+      key: 'overdue',
+      label: '已逾期',
+      hint: '需要尽快处理',
+      assignments: props.assignments.filter((assignment) => assignment.level === 'overdue'),
+    },
+    {
+      key: 'upcoming',
+      label: '近期',
+      hint: '七天内截止',
+      assignments: props.assignments.filter(
+        (assignment) => assignment.level === 'danger' || assignment.level === 'warning',
+      ),
+    },
+    {
+      key: 'later',
+      label: '稍后',
+      hint: '时间相对充足',
+      assignments: props.assignments.filter(
+        (assignment) =>
+          !assignment.isCompleted &&
+          !['overdue', 'danger', 'warning'].includes(assignment.level),
+      ),
+    },
+    {
+      key: 'completed',
+      label: '已完成',
+      hint: '已经提交',
+      assignments: props.assignments.filter((assignment) => assignment.isCompleted),
+    },
+  ]
+
+  return groups.filter((group) => group.assignments.length > 0)
+})
+
 function getRelativeDeadline(assignment) {
   if (assignment.isCompleted) return '已完成'
   if (assignment.daysLeft === null || assignment.daysLeft === undefined) return '未设置时间'
@@ -78,66 +122,91 @@ function getRelativeDeadline(assignment) {
       </div>
       <div v-if="showControls" class="deadline-controls">
         <label class="size-control">
-          作业数
-          <input
-            min="1"
-            type="number"
+          显示
+          <select
             :value="pageSize"
-            @input="emit('update:pageSize', Number($event.target.value) || 20)"
-          />
+            @change="emit('update:pageSize', Number($event.target.value) || 20)"
+          >
+            <option v-for="size in pageSizeOptions" :key="size" :value="size">{{ size }} 项</option>
+          </select>
         </label>
-        <label class="check-control">
+        <label class="toggle-control">
           <input
             :checked="includeCompleted"
             type="checkbox"
             @change="emit('update:includeCompleted', $event.target.checked)"
           />
-          显示已提交
+          <span class="toggle-track" aria-hidden="true"><i /></span>
+          <span>显示已提交</span>
         </label>
       </div>
     </div>
 
-    <div v-if="loading" class="empty-state">{{ loadingText }}</div>
+    <div v-if="loading" class="skeleton-list" :aria-label="loadingText">
+      <div v-for="index in 4" :key="index" class="skeleton-row">
+        <div>
+          <i class="skeleton-line" />
+          <i class="skeleton-line skeleton-line-short" />
+        </div>
+        <i class="skeleton-line skeleton-line-time" />
+      </div>
+    </div>
     <section v-else-if="error" class="notice error">
       {{ error }}
     </section>
-    <div v-else-if="assignments.length === 0" class="empty-state">{{ emptyText }}</div>
+    <div v-else-if="assignments.length === 0" class="empty-state empty-state-card">
+      <span class="empty-cloud" aria-hidden="true"><i /><i /></span>
+      <strong>{{ emptyText }}</strong>
+      <p>{{ includeCompleted ? '当前没有可显示的作业记录' : '新的待办作业会显示在这里' }}</p>
+    </div>
 
-    <div v-else class="deadline-list">
-      <button
-        v-for="assignment in assignments"
-        :key="assignment.id"
-        :aria-pressed="assignment.id === selectedAssignmentId"
-        class="deadline-item"
-        :class="[
-          `level-${assignment.level}`,
-          {
-            active: assignment.id === selectedAssignmentId,
-            loading: assignment.id === loadingAssignmentId,
-          },
-        ]"
-        type="button"
-        @click="emit('select', assignment)"
-      >
-        <div class="deadline-main">
-          <div class="deadline-title">
-            <strong>{{ assignment.title }}</strong>
-            <AssignmentStatus :level="assignment.level" :status="assignment.status" />
+    <div v-else class="deadline-groups">
+      <section v-for="group in assignmentGroups" :key="group.key" class="deadline-group">
+        <div class="deadline-group-header" :class="`group-${group.key}`">
+          <div>
+            <strong>{{ group.label }}</strong>
+            <span>{{ group.hint }}</span>
           </div>
-          <p>
-            <span v-if="assignment.courseName">{{ assignment.courseName }}</span>
-            <span v-if="assignment.courseName && assignment.chapter"> · </span>
-            <span>{{ assignment.chapter }}</span>
-          </p>
+          <small>{{ group.assignments.length }}</small>
         </div>
-        <div class="deadline-time">
-          <span class="deadline-relative" :class="`level-${assignment.level}`">
-            {{ getRelativeDeadline(assignment) }}
-          </span>
-          <strong>{{ assignment.deadline || '未设置' }}</strong>
-          <small v-if="assignment.submitTime">提交 {{ assignment.submitTime }}</small>
+
+        <div class="deadline-list">
+          <button
+            v-for="assignment in group.assignments"
+            :key="assignment.id"
+            :aria-pressed="assignment.id === selectedAssignmentId"
+            class="deadline-item"
+            :class="[
+              `level-${assignment.level}`,
+              {
+                active: assignment.id === selectedAssignmentId,
+                loading: assignment.id === loadingAssignmentId,
+              },
+            ]"
+            type="button"
+            @click="emit('select', assignment)"
+          >
+            <div class="deadline-main">
+              <div class="deadline-title">
+                <strong>{{ assignment.title }}</strong>
+                <AssignmentStatus :level="assignment.level" :status="assignment.status" />
+              </div>
+              <p>
+                <span v-if="assignment.courseName">{{ assignment.courseName }}</span>
+                <span v-if="assignment.courseName && assignment.chapter"> · </span>
+                <span>{{ assignment.chapter }}</span>
+              </p>
+            </div>
+            <div class="deadline-time">
+              <span class="deadline-relative" :class="`level-${assignment.level}`">
+                {{ getRelativeDeadline(assignment) }}
+              </span>
+              <strong>{{ assignment.deadline || '未设置' }}</strong>
+              <small v-if="assignment.submitTime">提交 {{ assignment.submitTime }}</small>
+            </div>
+          </button>
         </div>
-      </button>
+      </section>
     </div>
   </section>
 </template>

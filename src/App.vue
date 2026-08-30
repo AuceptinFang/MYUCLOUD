@@ -23,6 +23,7 @@ import {
   uploadBusinessResource,
 } from './api/ucloud'
 import AuthBar from './components/common/AuthBar.vue'
+import AssignmentStatus from './components/common/AssignmentStatus.vue'
 import AssignmentDetailPanel from './components/common/AssignmentDetailPanel.vue'
 import CourseGrid from './components/common/CourseGrid.vue'
 import CourseResourcePanel from './components/common/CourseResourcePanel.vue'
@@ -127,6 +128,27 @@ function getAssignmentId(assignment) {
 
 function getCourseName(course) {
   return course?.siteName || course?.name || '未命名课程'
+}
+
+function getCourseTeacherNames(course) {
+  const teachers = Array.isArray(course?.teachers) ? course.teachers : []
+  const names = teachers
+    .map((teacher) => teacher.realName || teacher.name || teacher.account)
+    .filter(Boolean)
+
+  return names.length ? names.join('、') : course?.primaryTeachers || '教师未标注'
+}
+
+function getCourseContextMeta(course) {
+  if (!course) return '正在读取课程信息'
+
+  return [
+    getCourseTeacherNames(course),
+    course.termName || '',
+    course.departmentName || course.department || '',
+  ]
+    .filter(Boolean)
+    .join(' · ')
 }
 
 function getViewFromHash() {
@@ -1206,6 +1228,7 @@ onUnmounted(() => {
 
       <CourseGrid
         :courses="courses"
+        :loading="loadingStudy"
         :loading-course-id="loadingCourseId"
         :selected-course-id="selectedCourseId"
         @select="openCourse"
@@ -1215,6 +1238,7 @@ onUnmounted(() => {
         v-model:page-size="assignmentPageSize"
         :assignments="visibleAssignments"
         :last-loaded-at="lastLoadedAt"
+        :loading="loadingStudy"
         :loading-assignment-id="loadingAssignmentId"
         :selected-assignment-id="selectedAssignmentId"
         @select="openAssignment"
@@ -1222,9 +1246,17 @@ onUnmounted(() => {
     </template>
 
     <template v-else-if="activeView === 'course'">
-      <div class="detail-actions">
-        <button class="button-secondary" type="button" @click="setView('study')">返回首页</button>
-        <div v-if="selectedCourse" class="detail-tabs" aria-label="课程详情">
+      <section class="detail-context">
+        <button class="detail-back" type="button" @click="setView('study')">
+          <span aria-hidden="true">←</span>
+          首页
+        </button>
+        <div class="detail-context-copy">
+          <span class="context-eyebrow">COURSE</span>
+          <h1>{{ selectedCourse ? getCourseName(selectedCourse) : '课程详情' }}</h1>
+          <p>{{ getCourseContextMeta(selectedCourse) }}</p>
+        </div>
+        <div v-if="selectedCourse" class="context-tabs" aria-label="课程详情">
           <button
             :class="{ active: activeCoursePanel === 'resources' }"
             type="button"
@@ -1240,7 +1272,7 @@ onUnmounted(() => {
             作业
           </button>
         </div>
-      </div>
+      </section>
       <CourseResourcePanel
         v-if="activeCoursePanel === 'resources'"
         :course="selectedCourse"
@@ -1266,19 +1298,37 @@ onUnmounted(() => {
     </template>
 
     <template v-else-if="activeView === 'assignment'">
-      <div class="detail-actions">
-        <button class="button-secondary" type="button" @click="setView('study')">返回首页</button>
-        <div class="detail-tabs" aria-label="课程">
-          <button type="button" @click="backToCourse('resources')">资料</button>
-          <button class="active" type="button" @click="backToCourse('assignments')">作业</button>
+      <section class="detail-context">
+        <button class="detail-back" type="button" @click="setView('study')">
+          <span aria-hidden="true">←</span>
+          首页
+        </button>
+        <div class="detail-context-copy">
+          <span class="context-eyebrow">ASSIGNMENT</span>
+          <h1>{{ selectedAssignment?.title || '作业详情' }}</h1>
+          <p>
+            {{ [selectedAssignment?.courseName, selectedAssignment?.chapter].filter(Boolean).join(' · ') || '正在读取作业信息' }}
+          </p>
         </div>
-      </div>
+        <div class="detail-context-side">
+          <AssignmentStatus
+            v-if="selectedAssignment"
+            :level="selectedAssignment.level"
+            :status="selectedAssignment.status"
+          />
+          <div class="context-tabs" aria-label="课程">
+            <button type="button" @click="backToCourse('resources')">资料</button>
+            <button class="active" type="button" @click="backToCourse('assignments')">作业</button>
+          </div>
+        </div>
+      </section>
       <AssignmentDetailPanel
         :assignment="selectedAssignment"
         :detail="assignmentDetail"
         :error="assignmentDetailError"
         :loading="Boolean(loadingAssignmentId)"
         :resources="assignmentResources"
+        :submit-view="assignmentSubmitView"
         :submit-error="assignmentSubmitError"
         :submit-result="assignmentSubmitResult"
         :submitting="submittingAssignment"

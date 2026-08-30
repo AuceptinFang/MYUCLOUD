@@ -2,12 +2,12 @@
 import { onMounted, onUnmounted, ref } from 'vue'
 
 const letters = [
-  { value: 'U', drift: 2.1 },
-  { value: 'C', drift: 1.5 },
-  { value: 'L', drift: 1.9 },
-  { value: 'O', drift: 1.3 },
-  { value: 'U', drift: 1.7 },
-  { value: 'D', drift: 1.1 },
+  { value: 'U', drift: 2.1, personality: 'captain' },
+  { value: 'C', drift: 1.5, personality: 'curious' },
+  { value: 'L', drift: 1.9, personality: 'steady' },
+  { value: 'O', drift: 1.3, personality: 'round' },
+  { value: 'U', drift: 1.7, personality: 'shy' },
+  { value: 'D', drift: 1.1, personality: 'scout' },
 ]
 
 const brand = ref(null)
@@ -54,12 +54,15 @@ function followPointer(event) {
   const distance = Math.hypot(dx, dy)
   const proximity = Math.max(0.25, 1 - distance / 1400)
 
+  root.classList.toggle('is-near', distance < 320)
+
   targetX = Math.max(-1, Math.min(1, dx / 360)) * proximity
   targetY = Math.max(-1, Math.min(1, dy / 280)) * proximity
   scheduleRender()
 }
 
 function returnToRest() {
+  brand.value?.classList.remove('is-near')
   targetX = 0
   targetY = 0
   scheduleRender()
@@ -90,15 +93,29 @@ onUnmounted(() => {
       v-for="(letter, index) in letters"
       :key="`${letter.value}-${index}`"
       class="letter-creature"
-      :style="{ '--rest-tilt': `${(index - 2.5) * 0.16}deg` }"
+      :class="`personality-${letter.personality}`"
+      :style="{
+        '--rest-tilt': `${(index - 2.5) * 0.16}deg`,
+        '--idle-delay': `${index * -0.47}s`,
+        '--idle-duration': `${(3.1 + letter.drift * 0.55).toFixed(2)}s`,
+        '--blink-delay': `${index * -0.83}s`,
+      }"
       aria-hidden="true"
     >
-      <span class="creature-eyes">
-        <i><b /></i>
-        <i><b /></i>
+      <span class="creature-motion">
+        <span class="creature-tuft"><i /><i /></span>
+        <span class="creature-eyes">
+          <i><b /></i>
+          <i><b /></i>
+        </span>
+        <span class="creature-arms"><i /><i /></span>
+        <span class="creature-body">
+          <span class="creature-letter">{{ letter.value }}</span>
+          <span class="creature-mouth" />
+          <span class="creature-badge" />
+        </span>
+        <span class="creature-feet"><i /><i /></span>
       </span>
-      <span class="creature-body">{{ letter.value }}</span>
-      <span class="creature-feet"><i /><i /></span>
     </span>
   </div>
 </template>
@@ -132,6 +149,16 @@ onUnmounted(() => {
   transition: filter 180ms ease;
 }
 
+.creature-motion {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 41px;
+  transform-origin: 50% 90%;
+  animation: creature-idle var(--idle-duration) ease-in-out var(--idle-delay) infinite;
+}
+
 .creature-body {
   position: relative;
   z-index: 1;
@@ -150,11 +177,51 @@ onUnmounted(() => {
   letter-spacing: -0.04em;
 }
 
+.creature-letter {
+  transform: translateY(-1px);
+}
+
+.creature-mouth {
+  position: absolute;
+  z-index: 2;
+  bottom: 4px;
+  left: 50%;
+  width: 5px;
+  height: 3px;
+  border-bottom: 1.5px solid #557083;
+  border-radius: 0 0 5px 5px;
+  transform: translateX(-50%);
+}
+
+.creature-body::before,
+.creature-body::after {
+  position: absolute;
+  bottom: 7px;
+  width: 3px;
+  height: 2px;
+  border-radius: 50%;
+  background: #d7a1a1;
+  content: "";
+  opacity: 0;
+}
+
+.creature-body::before {
+  left: 5px;
+}
+
+.creature-body::after {
+  right: 5px;
+}
+
 .letter-creature:first-child .creature-body {
   border-color: var(--cloud-blue);
   background: var(--cloud-blue);
   color: #ffffff;
   box-shadow: 0 4px 9px rgba(36, 74, 100, 0.16);
+}
+
+.letter-creature:first-child .creature-mouth {
+  border-bottom-color: rgba(255, 255, 255, 0.9);
 }
 
 .letter-creature:nth-child(2n) .creature-body {
@@ -173,6 +240,9 @@ onUnmounted(() => {
   display: flex;
   gap: 3px;
   transform: translateX(-50%);
+  transition:
+    gap 160ms ease,
+    transform 160ms ease;
 }
 
 .creature-eyes i {
@@ -184,6 +254,8 @@ onUnmounted(() => {
   border: 1px solid #8da8b8;
   border-radius: 50%;
   background: #ffffff;
+  transform-origin: center 70%;
+  animation: creature-blink 5.4s ease-in-out var(--blink-delay) infinite;
 }
 
 .creature-eyes b {
@@ -196,6 +268,81 @@ onUnmounted(() => {
   border-radius: 50%;
   background: #17384d;
   transform: translate(var(--pupil-x), var(--pupil-y));
+}
+
+.creature-arms {
+  position: absolute;
+  z-index: 0;
+  top: 21px;
+  left: 50%;
+  display: flex;
+  width: 38px;
+  justify-content: space-between;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.creature-arms i {
+  display: block;
+  width: 7px;
+  height: 3px;
+  border-radius: 999px;
+  background: #7892a2;
+  transform-origin: center right;
+  transition: transform 180ms ease;
+}
+
+.creature-arms i:first-child {
+  transform: rotate(18deg);
+}
+
+.creature-arms i:last-child {
+  transform: rotate(-18deg);
+  transform-origin: center left;
+}
+
+.creature-tuft {
+  position: absolute;
+  z-index: 0;
+  top: -7px;
+  left: 50%;
+  display: none;
+  width: 14px;
+  height: 9px;
+  transform: translateX(-50%);
+}
+
+.creature-tuft i {
+  position: absolute;
+  bottom: 0;
+  left: 6px;
+  display: block;
+  width: 2px;
+  height: 8px;
+  border-radius: 999px;
+  background: #7892a2;
+  transform: rotate(-23deg);
+  transform-origin: center bottom;
+}
+
+.creature-tuft i:last-child {
+  left: 8px;
+  height: 7px;
+  transform: rotate(25deg);
+}
+
+.creature-badge {
+  position: absolute;
+  z-index: 3;
+  top: 6px;
+  right: -3px;
+  display: none;
+  width: 7px;
+  height: 7px;
+  border: 1px solid #8da8b8;
+  border-radius: 50%;
+  background: #dceaf0;
+  box-shadow: 0 1px 2px rgba(36, 74, 100, 0.12);
 }
 
 .creature-feet {
@@ -213,15 +360,172 @@ onUnmounted(() => {
   height: 4px;
   border-radius: 50% 50% 2px 2px;
   background: #6f899a;
+  transform-origin: center top;
 }
 
 .ucloud-creatures:hover .letter-creature {
   filter: saturate(1.08);
 }
 
+.ucloud-creatures.is-near .creature-motion {
+  animation: creature-alert 1.05s ease-in-out var(--idle-delay) infinite;
+}
+
+.ucloud-creatures.is-near .creature-eyes {
+  gap: 4px;
+  transform: translate(-50%, -1px);
+}
+
+.ucloud-creatures.is-near .creature-feet i:first-child {
+  animation: creature-step-left 520ms ease-in-out var(--idle-delay) infinite alternate;
+}
+
+.ucloud-creatures.is-near .creature-feet i:last-child {
+  animation: creature-step-right 520ms ease-in-out var(--idle-delay) infinite alternate;
+}
+
+.ucloud-creatures.is-near .creature-arms i:first-child {
+  transform: rotate(-18deg) translateY(-1px);
+}
+
+.ucloud-creatures.is-near .creature-arms i:last-child {
+  transform: rotate(18deg) translateY(-1px);
+}
+
+.personality-captain .creature-badge,
+.personality-scout .creature-badge {
+  display: block;
+}
+
+.personality-curious .creature-tuft,
+.personality-scout .creature-tuft {
+  display: block;
+}
+
+.personality-curious .creature-mouth,
+.personality-round .creature-mouth {
+  width: 4px;
+  height: 4px;
+  border: 1.5px solid #557083;
+  border-radius: 50%;
+}
+
+.personality-steady .creature-body {
+  border-radius: 7px 7px 5px 5px;
+}
+
+.personality-steady .creature-arms i {
+  width: 8px;
+}
+
+.personality-round .creature-body {
+  border-radius: 14px 14px 12px 12px;
+}
+
+.personality-round .creature-body::before,
+.personality-round .creature-body::after,
+.personality-shy .creature-body::before,
+.personality-shy .creature-body::after {
+  opacity: 0.58;
+}
+
+.personality-shy .creature-eyes {
+  gap: 2px;
+}
+
+.personality-shy .creature-arms {
+  top: 27px;
+  width: 32px;
+}
+
+.personality-shy .creature-arms i:first-child {
+  transform: rotate(-28deg);
+}
+
+.personality-shy .creature-arms i:last-child {
+  transform: rotate(28deg);
+}
+
+.personality-scout .creature-tuft {
+  left: 60%;
+  transform: translateX(-50%) rotate(11deg);
+}
+
+.personality-scout .creature-badge {
+  top: 22px;
+  right: -2px;
+  width: 6px;
+  height: 6px;
+}
+
+.letter-creature:nth-child(2) .creature-eyes,
+.letter-creature:nth-child(5) .creature-eyes {
+  transform: translateX(-54%) rotate(-2deg);
+}
+
+.letter-creature:nth-child(4) .creature-eyes i {
+  width: 9px;
+  height: 9px;
+}
+
+@keyframes creature-idle {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  48% {
+    transform: translateY(-1.5px) rotate(0.35deg);
+  }
+  56% {
+    transform: translateY(-1px) rotate(-0.25deg);
+  }
+}
+
+@keyframes creature-alert {
+  0%,
+  100% {
+    transform: translateY(0) scaleY(1);
+  }
+  45% {
+    transform: translateY(-2.5px) scaleY(1.025);
+  }
+  58% {
+    transform: translateY(-1px) scaleY(0.985);
+  }
+}
+
+@keyframes creature-blink {
+  0%,
+  44%,
+  48%,
+  100% {
+    transform: scaleY(1);
+  }
+  46% {
+    transform: scaleY(0.12);
+  }
+}
+
+@keyframes creature-step-left {
+  to {
+    transform: translate(-1px, 1px) rotate(12deg);
+  }
+}
+
+@keyframes creature-step-right {
+  to {
+    transform: translate(1px, 1px) rotate(-12deg);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .letter-creature,
-  .creature-eyes b {
+  .creature-motion,
+  .creature-eyes i,
+  .creature-eyes b,
+  .creature-feet i,
+  .creature-arms i {
+    animation: none;
     transform: none;
   }
 }

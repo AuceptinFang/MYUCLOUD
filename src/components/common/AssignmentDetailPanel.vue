@@ -1,6 +1,5 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
-import AssignmentStatus from './AssignmentStatus.vue'
 import { BUSINESS_AUTH, TENANT_ID, TOKEN_KEY, buildPreviewUrl, getResourcePreviewUrl, pickPreviewData } from '../../api/ucloud'
 
 const props = defineProps({
@@ -368,23 +367,57 @@ function submitAssignment() {
   <section class="section-block assignment-detail-panel">
     <div class="section-header">
       <div>
-        <h2>{{ assignment ? getAssignmentTitle(assignment, detail) : '作业详情' }}</h2>
-        <p>{{ getAssignmentChapter(assignment, detail) }}</p>
+        <h2>作业内容</h2>
+        <p>{{ assignment ? `${getAssignmentTitle(assignment, detail)} · ${getAssignmentChapter(assignment, detail)}` : '选择作业后显示详情' }}</p>
       </div>
-      <span v-if="assignment" class="section-count">{{ resourceCount }}</span>
+      <span v-if="assignment" class="section-count">{{ resourceCount }} 个附件</span>
     </div>
 
-    <div v-if="!assignment" class="empty-state">选择作业后显示详情</div>
+    <div v-if="!assignment" class="empty-state empty-state-card">
+      <span class="empty-cloud" aria-hidden="true"><i /><i /></span>
+      <strong>尚未选择作业</strong>
+      <p>从待办列表进入一项作业后即可查看详情</p>
+    </div>
+
+    <div v-else-if="loading" class="detail-skeleton" aria-label="正在读取作业详情">
+      <div class="skeleton-facts">
+        <i v-for="index in 3" :key="index" />
+      </div>
+      <i class="skeleton-content-block" />
+      <div class="skeleton-row">
+        <div>
+          <i class="skeleton-line" />
+          <i class="skeleton-line skeleton-line-short" />
+        </div>
+      </div>
+    </div>
+
+    <section v-else-if="error" class="notice error">
+      {{ error }}
+    </section>
 
     <template v-else>
       <div class="assignment-summary">
-        <div class="assignment-summary-main">
-          <div class="assignment-summary-top">
-            <AssignmentStatus :level="assignment.level" :status="assignment.status" />
-            <span v-if="getAssignmentClassName(assignment, detail)" class="assignment-summary-class">
-              班级 {{ getAssignmentClassName(assignment, detail) }}
-            </span>
+        <div class="assignment-facts">
+          <div class="assignment-fact deadline-fact" :class="`level-${assignment.level}`">
+            <span>截止时间</span>
+            <strong>{{ getAssignmentDeadline(assignment, detail) || '未设置' }}</strong>
           </div>
+          <div v-if="getAssignmentBeginTime(assignment, detail)" class="assignment-fact">
+            <span>开始时间</span>
+            <strong>{{ getAssignmentBeginTime(assignment, detail) }}</strong>
+          </div>
+          <div v-if="getAssignmentSubmitTime(assignment, detail)" class="assignment-fact submitted-fact">
+            <span>提交时间</span>
+            <strong>{{ getAssignmentSubmitTime(assignment, detail) }}</strong>
+          </div>
+          <div v-if="getAssignmentClassName(assignment, detail)" class="assignment-fact">
+            <span>班级</span>
+            <strong>{{ getAssignmentClassName(assignment, detail) }}</strong>
+          </div>
+        </div>
+
+        <div class="assignment-summary-main">
           <div
             v-if="formatAssignmentContent(assignment, detail) && shouldRenderAssignmentContentHtml(assignment, detail)"
             class="assignment-content-box"
@@ -405,18 +438,16 @@ function submitAssignment() {
             {{ getAssignmentComment(assignment, detail, submitView) }}
           </div>
         </div>
-        <div class="assignment-summary-meta">
-          <span>截止 {{ getAssignmentDeadline(assignment, detail) || '未设置' }}</span>
-          <span v-if="getAssignmentSubmitTime(assignment, detail)">
-            提交 {{ getAssignmentSubmitTime(assignment, detail) }}
-          </span>
-          <span v-if="getAssignmentBeginTime(assignment, detail)">
-            开始 {{ getAssignmentBeginTime(assignment, detail) }}
-          </span>
-        </div>
       </div>
 
       <form class="assignment-submit-box" @submit.prevent="submitAssignment">
+        <div class="subsection-header">
+          <div>
+            <strong>提交作业</strong>
+            <span>填写内容或添加附件后提交</span>
+          </div>
+        </div>
+
         <label class="submit-content">
           提交内容
           <textarea
@@ -460,37 +491,46 @@ function submitAssignment() {
         </section>
       </form>
 
-      <div v-if="loading" class="empty-state">正在读取作业详情</div>
-      <section v-else-if="error" class="notice error">
-        {{ error }}
-      </section>
-      <div v-else-if="resources.length === 0" class="empty-state">暂无作业资源</div>
-
-      <div v-else class="attachment-list">
-        <div v-for="(resource, index) in resources" :key="resource.id || index" class="attachment-row">
-          <div class="attachment-main">
-            <a
-              v-if="getResourceUrl(resource)"
-              :class="{ 'link-loading': previewingId === getItemResourceId(resource) }"
-              href="#"
-              rel="noopener"
-              @click.prevent="previewResource(resource)"
-            >
-              {{ getResourceName(resource) }}
-            </a>
-            <strong v-else>{{ getResourceName(resource) }}</strong>
-            <span v-if="getResourceMeta(resource)">{{ getResourceMeta(resource) }}</span>
-            <button
-              v-if="getResourceUrl(resource)"
-              :disabled="downloadingId === getItemResourceId(resource)"
-              class="download-btn"
-              title="下载"
-              type="button"
-              @click.stop="downloadFile(resource)"
-            >↓</button>
+      <section class="assignment-resources">
+        <div class="subsection-header">
+          <div>
+            <strong>作业附件</strong>
+            <span>{{ resources.length ? `共 ${resources.length} 项` : '教师暂未添加附件' }}</span>
           </div>
         </div>
-      </div>
+
+        <div v-if="resources.length === 0" class="empty-state empty-state-card compact">
+          <span class="empty-cloud" aria-hidden="true"><i /><i /></span>
+          <strong>暂无作业附件</strong>
+          <p>本次作业没有需要下载的资源</p>
+        </div>
+
+        <div v-else class="attachment-list">
+          <div v-for="(resource, index) in resources" :key="resource.id || index" class="attachment-row">
+            <div class="attachment-main">
+              <a
+                v-if="getResourceUrl(resource)"
+                :class="{ 'link-loading': previewingId === getItemResourceId(resource) }"
+                href="#"
+                rel="noopener"
+                @click.prevent="previewResource(resource)"
+              >
+                {{ getResourceName(resource) }}
+              </a>
+              <strong v-else>{{ getResourceName(resource) }}</strong>
+              <span v-if="getResourceMeta(resource)">{{ getResourceMeta(resource) }}</span>
+              <button
+                v-if="getResourceUrl(resource)"
+                :disabled="downloadingId === getItemResourceId(resource)"
+                class="download-btn"
+                title="下载"
+                type="button"
+                @click.stop="downloadFile(resource)"
+              >↓</button>
+            </div>
+          </div>
+        </div>
+      </section>
     </template>
   </section>
 </template>
