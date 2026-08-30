@@ -1166,6 +1166,7 @@ onUnmounted(() => {
         v-model:password="password"
         v-model:token="bladeToken"
         v-model:username="username"
+        :authenticated="Boolean(userInfo)"
         :loading-data="loadingStudy"
         :loading-login="loggingIn"
         :user-label="userLabel"
@@ -1178,22 +1179,28 @@ onUnmounted(() => {
         {{ studyError }}
       </section>
 
-      <section class="metrics-grid">
-        <div class="metric-card">
-          <span>课程</span>
-          <strong>{{ courses.length }}</strong>
+      <section class="study-overview" aria-label="学习概览">
+        <div class="overview-heading">
+          <span>OVERVIEW</span>
+          <strong>学习概览</strong>
         </div>
-        <div class="metric-card">
-          <span>待完成</span>
-          <strong>{{ pendingAssignments.length }}</strong>
-        </div>
-        <div class="metric-card">
-          <span>临近截止</span>
-          <strong>{{ urgentAssignments.length }}</strong>
-        </div>
-        <div class="metric-card">
-          <span>已逾期</span>
-          <strong>{{ overdueAssignments.length }}</strong>
+        <div class="metrics-grid">
+          <div class="metric-card metric-course">
+            <span>课程</span>
+            <strong>{{ courses.length }}</strong>
+          </div>
+          <div class="metric-card metric-pending">
+            <span>待完成</span>
+            <strong>{{ pendingAssignments.length }}</strong>
+          </div>
+          <div class="metric-card metric-urgent">
+            <span>临近截止</span>
+            <strong>{{ urgentAssignments.length }}</strong>
+          </div>
+          <div class="metric-card metric-overdue">
+            <span>已逾期</span>
+            <strong>{{ overdueAssignments.length }}</strong>
+          </div>
         </div>
       </section>
 

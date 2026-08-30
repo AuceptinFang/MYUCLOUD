@@ -57,6 +57,16 @@ defineProps({
 })
 
 const emit = defineEmits(['update:includeCompleted', 'update:pageSize', 'select'])
+
+function getRelativeDeadline(assignment) {
+  if (assignment.isCompleted) return '已完成'
+  if (assignment.daysLeft === null || assignment.daysLeft === undefined) return '未设置时间'
+  if (assignment.daysLeft < 0) return `已逾期 ${Math.abs(assignment.daysLeft)} 天`
+  if (assignment.daysLeft === 0) return '今天截止'
+  if (assignment.daysLeft === 1) return '明天截止'
+
+  return `还剩 ${assignment.daysLeft} 天`
+}
 </script>
 
 <template>
@@ -121,7 +131,9 @@ const emit = defineEmits(['update:includeCompleted', 'update:pageSize', 'select'
           </p>
         </div>
         <div class="deadline-time">
-          <span>截止</span>
+          <span class="deadline-relative" :class="`level-${assignment.level}`">
+            {{ getRelativeDeadline(assignment) }}
+          </span>
           <strong>{{ assignment.deadline || '未设置' }}</strong>
           <small v-if="assignment.submitTime">提交 {{ assignment.submitTime }}</small>
         </div>

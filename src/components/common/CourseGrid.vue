@@ -43,7 +43,7 @@ function getTeacherNames(course) {
 
     <div v-else class="course-grid">
       <button
-        v-for="course in courses"
+        v-for="(course, index) in courses"
         :key="getCourseId(course)"
         :aria-pressed="getCourseId(course) === selectedCourseId"
         class="course-card"
@@ -55,11 +55,14 @@ function getTeacherNames(course) {
         @click="emit('select', course)"
       >
         <div class="course-content">
-          <strong>{{ course.siteName || '未命名课程' }}</strong>
-          <p>{{ getTeacherNames(course) }}</p>
+          <div class="course-heading">
+            <strong>{{ course.siteName || '未命名课程' }}</strong>
+            <span aria-hidden="true">{{ String(index + 1).padStart(2, '0') }}</span>
+          </div>
+          <p class="course-teacher">{{ getTeacherNames(course) }}</p>
           <div class="course-meta">
-            <span>{{ course.termName || '无学期' }}</span>
-            <span>{{ course.departmentName || course.department || '无院系' }}</span>
+            <span class="course-term">{{ course.termName || '无学期' }}</span>
+            <span class="course-department">{{ course.departmentName || course.department || '无院系' }}</span>
           </div>
         </div>
       </button>

@@ -125,7 +125,7 @@ p {
 
 .app-shell {
   display: grid;
-  gap: 16px;
+  gap: 18px;
   margin: 0 auto;
   max-width: 1160px;
   padding: 20px;
@@ -137,6 +137,8 @@ p {
   justify-content: space-between;
   gap: 16px;
   min-height: 60px;
+  padding: 3px 2px 14px;
+  border-bottom: 1px solid rgba(49, 95, 125, 0.13);
 }
 
 .app-brand {
@@ -166,6 +168,7 @@ p {
 }
 
 .view-tabs button {
+  position: relative;
   min-height: 38px;
   border: 0;
   border-radius: 0;
@@ -174,8 +177,19 @@ p {
 }
 
 .view-tabs button.active {
+  background: #f3f7f9;
+  color: var(--cloud-blue-strong);
+}
+
+.view-tabs button.active::after {
+  position: absolute;
+  right: 12px;
+  bottom: 0;
+  left: 12px;
+  height: 2px;
+  border-radius: 999px 999px 0 0;
   background: var(--cloud-blue);
-  color: #ffffff;
+  content: "";
 }
 
 .panel,
@@ -198,12 +212,139 @@ p {
 
 .auth-card {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 0.85fr) auto;
-  gap: 12px;
-  align-items: start;
-  padding: 14px;
+  grid-template-columns: minmax(156px, auto) minmax(0, 1fr);
+  gap: 0;
+  align-items: stretch;
+  padding: 0;
+  overflow: hidden;
   background: rgba(255, 255, 255, 0.86);
   box-shadow: none;
+}
+
+.auth-card.authenticated {
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 58px;
+}
+
+.auth-card.authenticated:has(.auth-access[open]) {
+  grid-template-columns: 1fr;
+}
+
+.auth-card.authenticated:has(.auth-access[open]) .auth-overview {
+  border-right: 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.auth-card.authenticated:has(.auth-access[open]) .auth-access {
+  grid-column: 1 / -1;
+}
+
+.auth-overview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border-right: 1px solid var(--line);
+  background: rgba(238, 244, 247, 0.48);
+}
+
+.auth-identity {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+.auth-identity > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.auth-identity span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.auth-identity strong {
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.auth-state-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #aeb7c2;
+  box-shadow: 0 0 0 4px #eef1f4;
+}
+
+.auth-state-dot.ready {
+  background: var(--success-green);
+  box-shadow: 0 0 0 4px var(--success-soft);
+}
+
+.auth-sign-out {
+  min-height: 32px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.auth-access {
+  min-width: 0;
+}
+
+.auth-access summary {
+  position: relative;
+  display: grid;
+  gap: 3px;
+  min-height: 58px;
+  align-content: center;
+  padding: 10px 42px 10px 16px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.auth-access summary::-webkit-details-marker {
+  display: none;
+}
+
+.auth-access summary::after {
+  position: absolute;
+  top: 50%;
+  right: 18px;
+  color: var(--muted);
+  content: "+";
+  font-size: 18px;
+  font-weight: 400;
+  transform: translateY(-50%);
+}
+
+.auth-access[open] summary::after {
+  content: "−";
+}
+
+.auth-access summary span {
+  color: #3f4c5f;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.auth-access summary small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.auth-methods {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.85fr);
+  gap: 14px;
+  padding: 14px 16px 16px;
+  border-top: 1px solid var(--line);
 }
 
 .auth-form,
@@ -219,23 +360,6 @@ p {
 
 .token-form {
   grid-template-columns: minmax(0, 1fr) auto auto;
-}
-
-.auth-user {
-  display: grid;
-  gap: 4px;
-  align-self: center;
-  min-width: 112px;
-}
-
-.auth-user span {
-  color: #4b5563;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.auth-user strong {
-  font-size: 15px;
 }
 
 .button-secondary {
@@ -264,30 +388,108 @@ p {
   color: var(--success-green);
 }
 
+.study-overview {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(150px, 0.72fr) minmax(0, 3.4fr);
+  overflow: hidden;
+  border: 1px solid rgba(49, 95, 125, 0.14);
+  border-radius: 10px;
+  background: var(--paper-white);
+  box-shadow: var(--shadow-subtle);
+}
+
+.study-overview::after {
+  position: absolute;
+  top: -45px;
+  right: -28px;
+  width: 180px;
+  height: 100px;
+  border: 1px solid rgba(49, 95, 125, 0.08);
+  border-radius: 50%;
+  content: "";
+  pointer-events: none;
+}
+
+.overview-heading {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  align-content: center;
+  gap: 5px;
+  padding: 18px 22px;
+  border-right: 1px solid rgba(49, 95, 125, 0.12);
+}
+
+.overview-heading span {
+  color: var(--cloud-blue);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.14em;
+}
+
+.overview-heading strong {
+  font-size: 15px;
+}
+
 .metrics-grid {
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  padding: 0px 0px 0px 30px;
 }
 
 .metric-card {
+  --metric-accent: var(--cloud-blue);
+  position: relative;
   display: grid;
   gap: 6px;
   border: 0;
+  border-radius: 0;
   background: transparent;
-  padding: 6px 4px;
+  padding: 17px 20px;
   box-shadow: none;
 }
 
+.metric-card + .metric-card::before {
+  position: absolute;
+  top: 17px;
+  bottom: 17px;
+  left: 0;
+  width: 1px;
+  background: rgba(49, 95, 125, 0.12);
+  content: "";
+}
+
+.metric-card.metric-urgent {
+  --metric-accent: var(--warning);
+}
+
+.metric-card.metric-overdue {
+  --metric-accent: var(--deadline-red);
+}
+
 .metric-card span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
+}
+
+.metric-card span::before {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--metric-accent);
+  content: "";
+  opacity: 0.78;
 }
 
 .metric-card strong {
-  font-size: 28px;
+  font-size: 30px;
   line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 
 .section-header {
@@ -333,12 +535,29 @@ p {
   box-shadow: 0 8px 20px rgba(23, 32, 51, 0.045);
   padding: 0;
   text-align: left;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.course-card::before {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--cloud-blue), #87aabb 72%, transparent);
+  content: "";
+  opacity: 0.72;
 }
 
 .course-card:not(:disabled):hover {
   border-color: #c9d2dc;
   background: #ffffff;
   box-shadow: 0 12px 28px rgba(23, 32, 51, 0.075);
+  transform: translateY(-2px);
 }
 
 .course-card:focus-visible {
@@ -348,8 +567,9 @@ p {
 }
 
 .course-card.active {
-  border-color: var(--cloud-blue);
-  box-shadow: 0 0 0 2px rgba(49, 95, 125, 0.1);
+  border-color: #e4e7ec;
+  box-shadow: 0 8px 20px rgba(23, 32, 51, 0.045);
+  transform: none;
 }
 
 .course-card.loading {
@@ -359,13 +579,35 @@ p {
 .course-content {
   display: grid;
   gap: 10px;
-  padding: 16px;
+  padding: 18px 16px 16px;
 }
 
-.course-content strong {
+.course-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.course-heading strong {
   overflow-wrap: anywhere;
   font-size: 16px;
   line-height: 1.35;
+}
+
+.course-heading span {
+  flex: 0 0 auto;
+  color: #b0bbc5;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.course-teacher::before {
+  margin-right: 6px;
+  color: #9aa7b4;
+  content: "授课";
+  font-size: 10px;
 }
 
 .course-meta {
@@ -376,12 +618,23 @@ p {
 }
 
 .course-meta span {
-  border-radius: 999px;
-  border: 1px solid #e5e7eb;
-  background: #ffffff;
   color: #5f6878;
   font-size: 12px;
-  padding: 5px 8px;
+}
+
+.course-term {
+  border: 1px solid #dce5ea;
+  border-radius: 999px;
+  background: var(--cloud-blue-soft);
+  padding: 4px 7px;
+}
+
+.course-department {
+  overflow: hidden;
+  align-self: center;
+  color: #7b8492;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .detail-actions {
@@ -563,6 +816,26 @@ p {
 
 .deadline-time strong {
   font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.deadline-time .deadline-relative {
+  color: var(--cloud-blue-strong);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.deadline-time .deadline-relative.level-danger,
+.deadline-time .deadline-relative.level-overdue {
+  color: var(--deadline-red);
+}
+
+.deadline-time .deadline-relative.level-warning {
+  color: var(--warning);
+}
+
+.deadline-time .deadline-relative.level-submitted {
+  color: var(--success-green);
 }
 
 
@@ -1346,14 +1619,23 @@ pre.assignment-content-box {
 }
 
 @media (max-width: 900px) {
-  .auth-card,
+  .auth-methods,
   .auth-form,
   .token-form {
     grid-template-columns: 1fr;
   }
 
+  .study-overview {
+    grid-template-columns: minmax(130px, 0.7fr) minmax(0, 3.3fr);
+  }
+
   .metrics-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .metric-card {
+    padding-right: 14px;
+    padding-left: 14px;
   }
 
   .debug-auth-grid,
@@ -1392,6 +1674,35 @@ pre.assignment-content-box {
     flex-direction: column;
   }
 
+  .view-tabs {
+    align-self: flex-start;
+  }
+
+  .auth-card,
+  .auth-card.authenticated,
+  .study-overview {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-overview {
+    border-right: 0;
+  }
+
+  .auth-access {
+    border-top: 1px solid var(--line);
+  }
+
+  .auth-methods {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .overview-heading {
+    padding: 14px 16px;
+    border-right: 0;
+    border-bottom: 1px solid rgba(49, 95, 125, 0.12);
+  }
+
   .api-composer {
     grid-template-columns: auto minmax(0, 1fr);
   }
@@ -1424,10 +1735,27 @@ pre.assignment-content-box {
     grid-template-columns: minmax(105px, 0.42fr) minmax(0, 1fr);
   }
 
-  .metrics-grid,
   .deadline-item,
   .assignment-summary {
     grid-template-columns: 1fr;
+  }
+
+  .metrics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .metric-card:nth-child(odd)::before {
+    display: none;
+  }
+
+  .metric-card:nth-child(n + 3)::after {
+    position: absolute;
+    top: 0;
+    right: 14px;
+    left: 14px;
+    height: 1px;
+    background: rgba(49, 95, 125, 0.12);
+    content: "";
   }
 
   .deadline-time,
@@ -1461,6 +1789,17 @@ pre.assignment-content-box {
 
   .resource-extra {
     white-space: normal;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .course-card {
+    transition: none;
+  }
+
+  .course-card:not(:disabled):hover,
+  .course-card.active {
+    transform: none;
   }
 }
 
