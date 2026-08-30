@@ -40,6 +40,15 @@ docker compose down         # 停止
 
 放在 src/plugin 目录下即可识别，页面右上角会增加一个链接过去的按钮
 
+## Web API 调试页
+
+调试页在本地开发时可用，生产构建默认不展示入口，也无法通过 `#debug` 打开。
+如需在生产构建中临时启用，显式设置：
+
+```sh
+VITE_ENABLE_DEBUG=true npm run build
+```
+
 ## 鉴权
 
 云平台的 `Blade-Auth` token 来自 UCloud OAuth 接口。真实流程是：

@@ -5,6 +5,12 @@ services:
     working_dir: /app
     ports:
       - "5173:5173"
+    # The host uses Tailscale MagicDNS (100.100.100.100), which Docker filters
+    # from the container's upstream resolvers. Configure reachable resolvers
+    # explicitly so Node.js fetch/getaddrinfo can resolve BUPT services.
+    dns:
+      - 223.5.5.5
+      - 119.29.29.29
     volumes:
       # 源码挂载：改代码即时反映到容器，配合 vite HMR 自动热更新
       - ./:/app

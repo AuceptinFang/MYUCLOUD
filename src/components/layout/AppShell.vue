@@ -6,9 +6,9 @@ defineProps({
     type: String,
     required: true,
   },
-  subtitle: {
-    type: String,
-    default: '课程与待办作业',
+  debugEnabled: {
+    type: Boolean,
+    default: false,
   },
   plugins: {
     type: Array,
@@ -24,7 +24,6 @@ const emit = defineEmits(['change-view'])
     <header class="app-header">
       <div class="app-brand">
         <UcloudCreatures />
-        <p>{{ subtitle }}</p>
       </div>
 
       <nav class="view-tabs" aria-label="页面">
@@ -45,6 +44,7 @@ const emit = defineEmits(['change-view'])
           {{ p.name }}
         </button>
         <button
+          v-if="debugEnabled"
           :class="{ active: activeView === 'debug' }"
           type="button"
           @click="emit('change-view', 'debug')"

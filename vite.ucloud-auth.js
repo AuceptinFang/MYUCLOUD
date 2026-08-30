@@ -14,6 +14,30 @@ function serverLog(label, data = {}) {
   console.log(`[ucloud-auth] ${now()} ${label}`, data)
 }
 
+function describeError(error) {
+  const cause = error?.cause || {}
+
+  return {
+    name: error?.name || 'Error',
+    message: error?.message || 'unknown error',
+    code: cause.code || error?.code || '',
+    errno: cause.errno ?? error?.errno ?? '',
+    syscall: cause.syscall || error?.syscall || '',
+    hostname: cause.hostname || error?.upstream || '',
+    upstream: error?.upstream || '',
+  }
+}
+
+async function fetchUpstream(url, options, stage) {
+  try {
+    return await fetch(url, options)
+  } catch (error) {
+    error.stage = stage
+    error.upstream = new URL(url).hostname
+    throw error
+  }
+}
+
 function redact(value) {
   if (typeof value !== 'string') return value
 
@@ -124,7 +148,7 @@ async function casLogin(username, password) {
   )}`
 
   serverLog('cas:get:start', { loginUrl, service: SERVICE_URL })
-  const loginPage = await fetch(loginUrl, { redirect: 'manual' })
+  const loginPage = await fetchUpstream(loginUrl, { redirect: 'manual' }, 'cas-get')
   const cookies = getCookies(loginPage.headers)
   const loginHtml = await loginPage.text()
   const execution = pickInputValue(loginHtml, 'execution')
@@ -158,7 +182,7 @@ async function casLogin(username, password) {
     },
   })
 
-  const casResponse = await fetch(loginUrl, {
+  const casResponse = await fetchUpstream(loginUrl, {
     method: 'POST',
     redirect: 'manual',
     headers: {
@@ -167,7 +191,7 @@ async function casLogin(username, password) {
       'User-Agent': 'Mozilla/5.0',
     },
     body: form,
-  })
+  }, 'cas-post')
 
   const location = casResponse.headers.get('location') || ''
   const ticket = location ? new URL(location).searchParams.get('ticket') || '' : ''
@@ -209,7 +233,7 @@ async function exchangeToken(ticket) {
     ticket: redact(ticket),
   })
 
-  const response = await fetch(TOKEN_URL, {
+  const response = await fetchUpstream(TOKEN_URL, {
     method: 'POST',
     headers: {
       Authorization: OAUTH_AUTHORIZATION,
@@ -217,7 +241,7 @@ async function exchangeToken(ticket) {
       'Content-Type': 'application/x-www-form-urlencoded',
     },
     body,
-  })
+  }, 'oauth-token')
   const result = await readRemoteResponse(response)
 
   serverLog('oauth:token:done', {
@@ -235,13 +259,13 @@ async function getUserInfo(accessToken) {
     accessToken: redact(accessToken),
   })
 
-  const response = await fetch(INFO_URL, {
+  const response = await fetchUpstream(INFO_URL, {
     headers: {
       Authorization: BUSINESS_AUTHORIZATION,
       'Tenant-Id': TENANT_ID,
       'Blade-Auth': accessToken,
     },
-  })
+  }, 'user-info')
   const result = await readRemoteResponse(response)
 
   serverLog('ucloud:info:done', {
@@ -315,14 +339,19 @@ async function handleLogin(req, res) {
       },
     })
   } catch (error) {
+    const detail = describeError(error)
     serverLog('login:error', {
-      name: error?.name,
-      message: error?.message,
+      ...detail,
+      stage: error?.stage || 'server',
       stack: error?.stack,
     })
     sendJson(res, 500, {
       success: false,
-      msg: error?.message || 'login failed',
+      stage: error?.stage || 'server',
+      msg: detail.hostname
+        ? `无法连接上游服务 ${detail.hostname}`
+        : error?.message || 'login failed',
+      error: detail,
     })
   }
 }

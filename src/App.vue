@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, defineAsyncComponent, onMounted, onUnmounted, ref } from 'vue'
 import {
   BUSINESS_AUTH,
   DEFAULT_DEBUG_URL,
@@ -27,12 +27,15 @@ import AssignmentDetailPanel from './components/common/AssignmentDetailPanel.vue
 import CourseGrid from './components/common/CourseGrid.vue'
 import CourseResourcePanel from './components/common/CourseResourcePanel.vue'
 import DeadlineList from './components/common/DeadlineList.vue'
-import DebugPanel from './components/common/DebugPanel.vue'
 import AppShell from './components/layout/AppShell.vue'
 import { usePlugins } from './plugin/index.js'
 import { normalizeAssignment, sortAssignments } from './utils/deadline'
 
 const ASSIGNMENT_FETCH_SIZE = 9999
+const debugEnabled = import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEBUG === 'true'
+const DebugPanel = debugEnabled
+  ? defineAsyncComponent(() => import('./components/common/DebugPanel.vue'))
+  : null
 
 const activeView = ref(getViewFromHash())
 const routeCourseId = ref(getRouteCourseId())
@@ -96,15 +99,11 @@ const userLabel = computed(
 const authPreview = computed(() => businessHeaders(bladeToken.value))
 const selectedCourseId = computed(() => getCourseId(selectedCourse.value))
 const selectedAssignmentId = computed(() => getAssignmentId(selectedAssignment.value))
-const shellSubtitle = computed(() => {
-  if (activeView.value === 'course') return '课程资料'
-  if (activeView.value === 'assignment') return '作业详情'
-  if (activeView.value === 'debug') return '接口调试'
-
-  return '课程与待办作业'
-})
-
 function setView(view) {
+  if (view === 'debug' && !debugEnabled) {
+    view = 'study'
+  }
+
   activeView.value = view
   if (view === 'debug') {
     window.location.hash = '#debug'
@@ -132,7 +131,7 @@ function getCourseName(course) {
 
 function getViewFromHash() {
   const hash = window.location.hash
-  if (hash === '#debug') return 'debug'
+  if (hash === '#debug') return debugEnabled ? 'debug' : 'study'
   if (hash.startsWith('#course/')) return 'course'
   if (hash.startsWith('#assignment/')) return 'assignment'
   if (hash.startsWith('#') && hash.length > 1) return hash.slice(1)
@@ -522,6 +521,7 @@ function saveBladeToken(nextToken, source) {
 
 async function login() {
   loggingIn.value = true
+  studyError.value = ''
 
   try {
     const { request, result } = await loginWithCredentials({
@@ -535,6 +535,13 @@ async function login() {
 
     const nextToken = pickToken(result.body)
     if (!nextToken) {
+      const detail = result.body?.error || {}
+      const reason = [result.body?.stage, detail.code, detail.hostname].filter(Boolean).join(' · ')
+      studyError.value = [result.body?.msg || `登录接口返回 HTTP ${result.status}`, reason]
+        .filter(Boolean)
+        .join('（')
+      if (reason) studyError.value += '）'
+
       log('auth:no-token-found', {
         triedFields: [
           'token',
@@ -556,6 +563,7 @@ async function login() {
 
     await loadStudyData()
   } catch (error) {
+    studyError.value = `登录请求失败：${error?.message || '无法连接本地登录接口'}`
     logError('login:error', error)
   } finally {
     loggingIn.value = false
@@ -1147,7 +1155,12 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <AppShell :active-view="activeView" :subtitle="shellSubtitle" :plugins="plugins" @change-view="setView">
+  <AppShell
+    :active-view="activeView"
+    :debug-enabled="debugEnabled"
+    :plugins="plugins"
+    @change-view="setView"
+  >
     <template v-if="activeView === 'study'">
       <AuthBar
         v-model:password="password"
@@ -1274,7 +1287,7 @@ onUnmounted(() => {
     </template>
 
     <DebugPanel
-      v-else
+      v-else-if="activeView === 'debug' && debugEnabled"
       v-model:api-url="apiUrl"
       v-model:login-url="loginUrl"
       v-model:password="password"
@@ -1291,5 +1304,7 @@ onUnmounted(() => {
       @login="login"
       @request="requestWithAuth"
     />
+
+    <section v-else class="notice error">页面不存在</section>
   </AppShell>
 </template>

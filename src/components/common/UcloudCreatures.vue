@@ -109,8 +109,8 @@ onUnmounted(() => {
   --pupil-y: 0px;
   display: inline-flex;
   align-items: flex-end;
-  gap: 4px;
-  min-height: 43px;
+  gap: 5px;
+  min-height: 51px;
   padding: 4px 1px 3px;
   cursor: default;
   user-select: none;
@@ -123,8 +123,8 @@ onUnmounted(() => {
   position: relative;
   display: inline-grid;
   place-items: center;
-  width: 27px;
-  height: 34px;
+  width: 32px;
+  height: 41px;
   transform:
     translate(var(--body-x), var(--body-y))
     rotate(calc(var(--tilt) + var(--rest-tilt)));
@@ -137,14 +137,14 @@ onUnmounted(() => {
   z-index: 1;
   display: grid;
   place-items: center;
-  width: 27px;
-  height: 30px;
+  width: 32px;
+  height: 36px;
   border: 1px solid #c7d7e1;
   border-radius: 10px 10px 8px 8px;
   background: rgba(255, 255, 255, 0.78);
   box-shadow: 0 3px 7px rgba(36, 74, 100, 0.07);
   color: var(--cloud-blue-strong);
-  font-size: 17px;
+  font-size: 20px;
   font-weight: 850;
   line-height: 1;
   letter-spacing: -0.04em;
@@ -168,18 +168,18 @@ onUnmounted(() => {
 .creature-eyes {
   position: absolute;
   z-index: 2;
-  top: -1px;
+  top: -2px;
   left: 50%;
   display: flex;
-  gap: 2px;
+  gap: 3px;
   transform: translateX(-50%);
 }
 
 .creature-eyes i {
   position: relative;
   display: block;
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   overflow: hidden;
   border: 1px solid #8da8b8;
   border-radius: 50%;
@@ -191,8 +191,8 @@ onUnmounted(() => {
   top: 2px;
   left: 2px;
   display: block;
-  width: 2px;
-  height: 2px;
+  width: 3px;
+  height: 3px;
   border-radius: 50%;
   background: #17384d;
   transform: translate(var(--pupil-x), var(--pupil-y));
@@ -203,14 +203,14 @@ onUnmounted(() => {
   bottom: -1px;
   left: 50%;
   display: flex;
-  gap: 9px;
+  gap: 11px;
   transform: translateX(-50%);
 }
 
 .creature-feet i {
   display: block;
-  width: 5px;
-  height: 3px;
+  width: 6px;
+  height: 4px;
   border-radius: 50% 50% 2px 2px;
   background: #6f899a;
 }
