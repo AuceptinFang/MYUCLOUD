@@ -320,6 +320,20 @@ export function pickPreviewData(body) {
   }
 }
 
+export function isVideoResource({ previewUrl = '', ext = '', mimeType = '', name = '' } = {}) {
+  if (/^video\//i.test(mimeType)) return true
+
+  const videoExtension = /\.(mp4|m4v|webm|ogv|ogg|mov|avi|mkv|wmv|flv|mpeg|mpg|3gp)$/i
+  return videoExtension.test(`.${String(ext).replace(/^\./, '')}`)
+    || videoExtension.test(name)
+    || videoExtension.test(previewUrl.split(/[?#]/, 1)[0])
+}
+
+// 保留路径和查询参数，文件请求经同源代理设置来源头。
+export function buildFileUrl(url = '') {
+  return url.replace(/^https?:\/\/fileucloud\.bupt\.edu\.cn(?=\/)/i, '/file')
+}
+
 // 把后端返回的 onlinePreview / previewUrl 拼成本站可直开的预览地址。
 // onlinePreview 形如 https://ucloud.bupt.edu.cn/office/?ssl=1&n=1&bclr=000&furl=
 // 经 Vite /office 代理转发，绕开 course.html 的强制登录与跨域。

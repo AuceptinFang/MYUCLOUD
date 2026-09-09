@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { BUSINESS_AUTH, TENANT_ID, TOKEN_KEY, buildPreviewUrl, getResourcePreviewUrl, pickPreviewData } from '../../api/ucloud'
+import VideoPreview from './VideoPreview.vue'
+import { BUSINESS_AUTH, TENANT_ID, TOKEN_KEY, buildPreviewUrl, buildFileUrl, isVideoResource, getResourcePreviewUrl, pickPreviewData } from '../../api/ucloud'
 
 const props = defineProps({
   assignment: {
@@ -48,6 +49,7 @@ const pickedFiles = ref([])
 const assignmentContent = ref('')
 const resourceCount = computed(() => props.resources.length)
 const previewingId = ref('')
+const videoPreview = ref(null)
 const downloadingId = ref('')
 
 watch(
@@ -240,13 +242,18 @@ async function previewResource(resource) {
     if (!result.ok || result.body?.code !== 200) return
 
     const { previewUrl, onlinePreview } = pickPreviewData(result.body)
+    if (!previewUrl) return
+    if (isVideoResource({ ...getFileResource(resource), previewUrl, name: getResourceName(resource) })) {
+      videoPreview.value = { url: buildFileUrl(previewUrl), name: getResourceName(resource) }
+      return
+    }
 
     const url = buildPreviewUrl({ previewUrl, onlinePreview })
     if (!url) return
 
     window.open(url, '_blank', 'noopener')
   } catch { /* 静默 */ }
-  previewingId.value = ''
+  finally { previewingId.value = '' }
 }
 
 async function downloadFile(resource) {
@@ -364,6 +371,13 @@ function submitAssignment() {
 </script>
 
 <template>
+  <VideoPreview
+    v-if="videoPreview"
+    :key="videoPreview.url"
+    :url="videoPreview.url"
+    :name="videoPreview.name"
+    @close="videoPreview = null"
+  />
   <section class="section-block assignment-detail-panel">
     <div class="section-header">
       <div>

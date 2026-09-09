@@ -362,6 +362,8 @@ GET https://apiucloud.bupt.edu.cn/blade-source/resource/preview-url?resourceId=<
 - `previewUrl` — 文件直链，带 `response-content-disposition=attachment` 参数，用于下载
 - `onlinePreview` — Office 在线预览基础地址
 
+本项目预览视频时根据文件后缀、文件名或 MIME 类型识别视频，在页面内使用浏览器播放器打开，不交给 Office 预览服务。视频直链通过 `/file` 同源代理加载，保留原始路径和查询参数，支持浏览器分段请求；浏览器不支持的视频编码可使用播放器下方的下载入口。
+
 拿到这两个字段后拼接 ucloud 预览页 URL：
 
 ```text
@@ -555,6 +557,8 @@ POST https://apiucloud.bupt.edu.cn/ykt-site/site-resource/tree/student?siteId=<c
 注意参数名是 `siteId` 和 `userId`。抓包里容易把 `I` 看成 `l`，写成 `siteld/userld` 会被后端当作缺少参数。
 
 返回的资料树在 `data`。目录节点常见字段包括 `id`、`resourceName`、`resourceType`、`children`、`attachmentVOs`；附件文件信息在 `attachmentVOs[].resource`，常见字段包括 `name`、`ext`、`fileSize`、`fileSizeUnit`、`mimeType`、`url`。
+
+外部链接附件的 `type` 为 `2`，`resource` 可以是空对象，标题和地址分别在 `siteResourceLink.title` 与 `siteResourceLink.link`。页面显示链接标题并在新标签页打开，不调用文件预览或下载接口。`recommendLearnTime` 为 `-1` 等非正数时不显示建议学习时长。
 
 ## curl 示例
 

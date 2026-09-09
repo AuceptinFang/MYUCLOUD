@@ -1,10 +1,11 @@
 <script setup>
 import { computed, ref } from 'vue'
+import VideoPreview from './VideoPreview.vue'
 import {
-  BUSINESS_AUTH,
-  TENANT_ID,
   TOKEN_KEY,
   buildPreviewUrl,
+  buildFileUrl,
+  isVideoResource,
   getResourcePreviewUrl,
   pickPreviewData,
 } from '../../api/ucloud'
@@ -84,25 +85,47 @@ function getNodeName(node) {
 
 function getNodeMeta(node) {
   const parts = [
-    node.resourceTypeName || node.resourceType || '',
-    node.recommendLearnTime ? `建议 ${node.recommendLearnTime}` : '',
+    node.resourceTypeName || '',
+    Number(node.recommendLearnTime) > 0 ? `建议 ${node.recommendLearnTime}` : '',
   ].filter(Boolean)
 
   return parts.join(' · ')
 }
 
 function getAttachmentName(attachment) {
+  if (isLinkAttachment(attachment)) {
+    return attachment.siteResourceLink?.title || getAttachmentLinkUrl(attachment) || '外部链接'
+  }
+
   const resource = getAttachmentResource(attachment)
 
   return resource.name || resource.fileName || attachment?.name || attachment?.fileName || '未命名附件'
 }
 
 function getAttachmentMeta(attachment) {
+  if (isLinkAttachment(attachment)) return '外部链接'
+
   const resource = getAttachmentResource(attachment)
   const ext = resource.ext || resource.fileType || ''
   const size = resource.fileSizeUnit || resource.size || ''
 
   return [ext, size].filter(Boolean).join(' · ')
+}
+
+function isLinkAttachment(attachment) {
+  return String(attachment?.type) === '2' || Boolean(attachment?.siteResourceLink?.link)
+}
+
+function getAttachmentLinkUrl(attachment) {
+  const link = attachment?.siteResourceLink?.link
+  if (typeof link !== 'string') return ''
+
+  try {
+    const url = new URL(link)
+    return ['https:', 'http:'].includes(url.protocol) ? url.href : ''
+  } catch {
+    return ''
+  }
 }
 
 function getAttachmentUrl(attachment) {
@@ -123,6 +146,7 @@ function getDepthStyle(row) {
 }
 
 const previewingId = ref('')
+const videoPreview = ref(null)
 const downloadingId = ref('')
 
 function getAttachmentResourceId(attachment) {
@@ -143,12 +167,17 @@ async function previewAttachment(attachment) {
     if (!result.ok || result.body?.code !== 200) return
 
     const { previewUrl, onlinePreview } = pickPreviewData(result.body)
+    if (!previewUrl) return
+    if (isVideoResource({ ...getAttachmentResource(attachment), previewUrl, name: getAttachmentName(attachment) })) {
+      videoPreview.value = { url: buildFileUrl(previewUrl), name: getAttachmentName(attachment) }
+      return
+    }
     const url = buildPreviewUrl({ previewUrl, onlinePreview })
     if (!url) return
 
     window.open(url, '_blank', 'noopener')
   } catch { /* 静默 */ }
-  previewingId.value = ''
+  finally { previewingId.value = '' }
 }
 
 async function downloadAttachment(attachment) {
@@ -184,6 +213,13 @@ async function downloadAttachment(attachment) {
 </script>
 
 <template>
+  <VideoPreview
+    v-if="videoPreview"
+    :key="videoPreview.url"
+    :url="videoPreview.url"
+    :name="videoPreview.name"
+    @close="videoPreview = null"
+  />
   <section class="section-block resource-panel">
     <div class="section-header">
       <div>
@@ -230,8 +266,19 @@ async function downloadAttachment(attachment) {
             <span v-if="getNodeMeta(row.node)">{{ getNodeMeta(row.node) }}</span>
           </template>
           <template v-else>
+            <template v-if="isLinkAttachment(row.attachment)">
+              <a
+                v-if="getAttachmentLinkUrl(row.attachment)"
+                :href="getAttachmentLinkUrl(row.attachment)"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {{ getAttachmentName(row.attachment) }}
+              </a>
+              <span v-else>{{ getAttachmentName(row.attachment) }}（链接不可用）</span>
+            </template>
             <a
-              v-if="getAttachmentUrl(row.attachment)"
+              v-else-if="getAttachmentUrl(row.attachment)"
               :class="{ 'link-loading': previewingId === getAttachmentResourceId(row.attachment) }"
               href="#"
               rel="noopener"
@@ -245,7 +292,7 @@ async function downloadAttachment(attachment) {
         <span v-if="row.type === 'attachment'" class="resource-extra">
           {{ getAttachmentMeta(row.attachment) }}
           <button
-            v-if="getAttachmentUrl(row.attachment)"
+            v-if="!isLinkAttachment(row.attachment) && getAttachmentUrl(row.attachment)"
             :disabled="downloadingId === getAttachmentResourceId(row.attachment)"
             class="download-btn"
             title="下载"

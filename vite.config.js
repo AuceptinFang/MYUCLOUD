@@ -33,6 +33,8 @@ export default defineConfig({
         configure: (proxy) => {
           proxy.on('proxyReq', (proxyReq) => {
             proxyReq.removeHeader('Authorization');
+            proxyReq.removeHeader('Blade-Auth');
+            proxyReq.removeHeader('Tenant-Id');
           });
         }
       },
