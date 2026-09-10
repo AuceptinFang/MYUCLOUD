@@ -15,6 +15,10 @@ export default defineConfig({
     vueDevTools(),
   ],
   server: {
+    fs: {
+      deny: ['.env', '.env.*', '*.{crt,pem,key,p12,pfx,cer,der}', '.npmrc', '.yarnrc.yml', '**/.git/**', '**/.jwgl-sessions*.local'],
+    },
+    watch: { ignored: ['**/.jwgl-sessions*.local'] },
     proxy: {
       '/ucloud': {
         target: 'https://apiucloud.bupt.edu.cn',

@@ -1,3 +1,6 @@
+import { parseTimetable } from './jwgl-timetable.js'
+import { JwglSessionStore } from './jwgl-sessions.js'
+
 const JWGL_BASE = 'https://jwgl.bupt.edu.cn'
 
 function now() {
@@ -284,7 +287,7 @@ function generatePreciseEvaluation(form, targetScore) {
 //
 // ── session store ──────────────────────────────────────────────────────────
 
-const sessions = new Map() // sessionId -> { cookies, username, createdAt }
+let sessions
 
 function makeSessionId() {
   return crypto.randomUUID()
@@ -320,15 +323,39 @@ function parseSetCookies(resp) {
   return raw.split(',').map(s => s.trim().split(';')[0]).filter(Boolean).join('; ')
 }
 
+function mergeCookies(current = '', updates = '') {
+  if (!updates) return current
+  const names = new Set(updates.split('; ').map((cookie) => cookie.split('=')[0]))
+  return [...current.split('; ').filter((cookie) => !names.has(cookie.split('=')[0])), updates].filter(Boolean).join('; ')
+}
+
+async function validateSession(sessionId) {
+  const session = getSession(sessionId)
+  if (!session) throw Object.assign(new Error('教务凭证已过期，请重新登录'), { status: 401 })
+  try {
+    const response = await jwglGet('/jsxsd/xspj/xspj_find.do', session.cookies)
+    session.cookies = response.cookies
+    sessions.set(sessionId, session)
+    return session
+  } catch (error) {
+    if (error.status === 401) sessions.delete(sessionId)
+    throw error
+  }
+}
+
 async function jwglGet(path, cookies, referer) {
   const url = JWGL_BASE + path
   const headers = buildHeaders(cookies, referer ? { Referer: referer } : {})
   log('jwgl:get', { url, hasCookies: Boolean(cookies && cookies.trim()), hasReferer: Boolean(referer) })
   const resp = await fetch(url, { headers })
   const body = await resp.text()
+  if (resp.status === 401 || resp.status === 403 || isLoginPage(body)) {
+    throw Object.assign(new Error('教务凭证已过期，请重新登录'), { status: 401 })
+  }
+  if (!resp.ok) throw new Error(`教务请求失败 HTTP ${resp.status}`)
   const newCookies = parseSetCookies(resp)
-  const resultCookies = newCookies || cookies || ''
-  log('jwgl:get:done', { status: resp.status, url: resp.url, bodyLen: body.length, cookies: resultCookies })
+  const resultCookies = mergeCookies(cookies, newCookies)
+  log('jwgl:get:done', { status: resp.status, url: resp.url, bodyLen: body.length })
   return { status: resp.status, body, cookies: resultCookies }
 }
 
@@ -344,9 +371,13 @@ async function jwglPost(path, data, cookies, referer) {
   log('jwgl:post', { url, textareaData, hasCookies: Boolean(cookies && cookies.trim()) })
   const resp = await fetch(url, { method: 'POST', headers, body })
   const respBody = await resp.text()
+  if (resp.status === 401 || resp.status === 403 || isLoginPage(respBody)) {
+    throw Object.assign(new Error('教务凭证已过期，请重新登录'), { status: 401 })
+  }
+  if (!resp.ok) throw new Error(`教务请求失败 HTTP ${resp.status}`)
   const newCookies = parseSetCookies(resp)
-  const resultCookies = newCookies || cookies || ''
-  log('jwgl:post:done', { status: resp.status, url: resp.url, bodyLen: respBody.length, cookies: resultCookies })
+  const resultCookies = mergeCookies(cookies, newCookies)
+  log('jwgl:post:done', { status: resp.status, url: resp.url, bodyLen: respBody.length })
   return { status: resp.status, body: respBody, cookies: resultCookies }
 }
 
@@ -493,6 +524,7 @@ async function* runEvaluation(cookies, targetScore, comment, commentImprove, sel
       totalSaved++
     } catch (err) {
       log('evaluate:course:error', { courseIndex: i + 1, error: err.message })
+      if (err.status === 401) { yield { type: 'error', code: 401, message: err.message }; return }
       yield {
         type: 'course-error',
         courseIndex: i + 1,
@@ -534,6 +566,7 @@ async function* runSubmit(cookies) {
       }
     }
   } catch (err) {
+    if (err.status === 401) { yield { type: 'error', code: 401, message: err.message }; return }
     yield { type: 'step', step: 'submit-error', message: `提交失败: ${err.message}` }
   }
   yield { type: 'done', totalSaved: 0, message: '提交完成' }
@@ -596,14 +629,16 @@ async function handleLogin(req, res) {
       }),
       body: r2Body,
     })
-    const cookies2 = parseSetCookies(r2) || cookies
+    const cookies2 = mergeCookies(cookies, parseSetCookies(r2))
 
     // step 3: verify by fetching find.do — capture cookies from this response too
     const r3 = await fetch(JWGL_BASE + '/jsxsd/xspj/xspj_find.do', {
       headers: buildHeaders(cookies2, { Referer: JWGL_BASE + '/jsxsd/' }),
     })
     const r3Body = await r3.text()
-    const cookies3 = parseSetCookies(r3) || cookies2
+    const cookies3 = mergeCookies(cookies2, parseSetCookies(r3))
+
+    if (!r3.ok) throw new Error(`教务登录验证失败 HTTP ${r3.status}`)
 
     if (isLoginPage(r3Body)) {
       const text = parseText(r3Body)
@@ -613,9 +648,11 @@ async function handleLogin(req, res) {
     }
 
     const sessionId = makeSessionId()
-    sessions.set(sessionId, { cookies: cookies3, username, createdAt: Date.now() })
-    log('login:done', { username, sessionId })
-    sendJson(res, 200, { success: true, sessionId })
+    const expiresAt = Date.now() + 7 * 86400000
+    sessions.set(sessionId, { cookies: cookies3, username, createdAt: Date.now(), expiresAt })
+    log('login:done', { username })
+    res.setHeader('Cache-Control', 'no-store')
+    sendJson(res, 200, { success: true, sessionId, username, expiresAt })
   } catch (error) {
     log('handleLogin:error', { message: error.message })
     sendJson(res, 500, { success: false, msg: error.message || '登录失败' })
@@ -644,7 +681,8 @@ async function handleEvaluate(req, res) {
       return
     }
 
-    log('handleEvaluate:start', { sessionId, targetScore: scoreNum, hasComment: Boolean(comment), hasImprove: Boolean(commentImprove), selectedN: selectedCourses?.length })
+    await validateSession(sessionId)
+    log('handleEvaluate:start', { targetScore: scoreNum, hasComment: Boolean(comment), hasImprove: Boolean(commentImprove), selectedN: selectedCourses?.length })
 
     // SSE headers
     res.statusCode = 200
@@ -655,6 +693,7 @@ async function handleEvaluate(req, res) {
 
     try {
       for await (const event of runEvaluation(session.cookies, scoreNum, comment, commentImprove, selectedCourses)) {
+        if (event.code === 401) sessions.delete(sessionId)
         res.write('data: ' + JSON.stringify(event) + '\n\n')
       }
     } catch (err) {
@@ -667,7 +706,7 @@ async function handleEvaluate(req, res) {
     log('handleEvaluate:error', { message: error.message, stack: error.stack })
     // if headers haven't been sent yet (e.g. invalid JSON body)
     if (!res.headersSent) {
-      sendJson(res, 500, { success: false, msg: error.message || '评教失败' })
+      sendJson(res, error.status || 500, { success: false, msg: error.message || '评教失败' })
     } else {
       res.write('data: ' + JSON.stringify({ type: 'error', message: error.message }) + '\n\n')
       res.end()
@@ -691,7 +730,8 @@ async function handleSubmit(req, res) {
       return
     }
 
-    log('handleSubmit:start', { sessionId })
+    await validateSession(sessionId)
+    log('handleSubmit:start')
 
     res.statusCode = 200
     res.setHeader('Content-Type', 'text/event-stream; charset=utf-8')
@@ -701,6 +741,7 @@ async function handleSubmit(req, res) {
 
     try {
       for await (const event of runSubmit(session.cookies)) {
+        if (event.code === 401) sessions.delete(sessionId)
         res.write('data: ' + JSON.stringify(event) + '\n\n')
       }
     } catch (err) {
@@ -712,7 +753,7 @@ async function handleSubmit(req, res) {
   } catch (error) {
     log('handleSubmit:error', { message: error.message })
     if (!res.headersSent) {
-      sendJson(res, 500, { success: false, msg: error.message || '提交失败' })
+      sendJson(res, error.status || 500, { success: false, msg: error.message || '提交失败' })
     } else {
       res.write('data: ' + JSON.stringify({ type: 'error', message: error.message }) + '\n\n')
       res.end()
@@ -726,6 +767,7 @@ export function jwglPlugin() {
   return {
     name: 'mock-jwgl',
     configureServer(server) {
+      sessions ||= new JwglSessionStore()
       server.middlewares.use('/api/jwgl/login', (req, res, next) => {
         if (req.method !== 'POST') {
           next()
@@ -744,11 +786,68 @@ export function jwglPlugin() {
           if (!session) { sendJson(res, 401, { success: false, msg: '会话已过期' }); return }
           const { courses, cookies: refreshedCookies } = await fetchCourses(session.cookies)
           session.cookies = refreshedCookies
+          sessions.set(sessionId, session)
           sendJson(res, 200, { success: true, courses })
         } catch (e) {
           log('courses:error', { message: e.message })
-          sendJson(res, 500, { success: false, msg: e.message })
+          sendJson(res, e.status || 500, { success: false, msg: e.message })
         }
+      })
+
+      server.middlewares.use('/api/jwgl/timetable', async (req, res, next) => {
+        if (req.method !== 'POST') { next(); return }
+        try {
+          const { sessionId, week, mode } = await readRequestBody(req)
+          const session = getSession(sessionId)
+          if (!session) { sendJson(res, 401, { success: false, msg: '请先登录教务系统' }); return }
+          if ((week !== undefined && (!Number.isInteger(week) || week < 0 || week > 60))
+            || (mode !== undefined && (typeof mode !== 'string' || !/^[A-Fa-f0-9]{32}$/.test(mode)))) {
+            sendJson(res, 400, { success: false, msg: '周次或节次模式无效' }); return
+          }
+          const params = new URLSearchParams()
+          if (week !== undefined) params.set('xkzc', String(week))
+          if (mode !== undefined) params.set('kbjcmsid', mode)
+          const response = await fetch(`${JWGL_BASE}/jsxsd/framework/xsdPerson.jsp?${params}`, {
+            headers: buildHeaders(session.cookies, { Referer: `${JWGL_BASE}/jsxsd/framework/xsMain_bjyddx.jsp` }),
+            signal: AbortSignal.timeout(30000),
+          })
+          const html = await response.text()
+          if (response.status === 401 || response.status === 403 || isLoginPage(html)) {
+            sessions.delete(sessionId)
+            sendJson(res, 401, { success: false, msg: '教务会话已过期，请重新登录' }); return
+          }
+          if (!response.ok) throw new Error(`获取课表失败 HTTP ${response.status}`)
+          // 保留未更新的路由 Cookie，仅替换上游明确更新的同名项。
+          session.cookies = mergeCookies(session.cookies, parseSetCookies(response))
+          sessions.set(sessionId, session)
+          const timetable = parseTimetable(html)
+          if ((week !== undefined && timetable.week !== week) || (mode !== undefined && timetable.mode !== mode)) {
+            throw new Error('教务系统返回的周次或节次模式不匹配，请稍后重试')
+          }
+          res.setHeader('Cache-Control', 'no-store')
+          sendJson(res, 200, { success: true, timetable })
+        } catch (error) {
+          sendJson(res, 502, { success: false, msg: error.message || '获取课表失败' })
+        }
+      })
+
+      server.middlewares.use('/api/jwgl/session', async (req, res, next) => {
+        if (req.method !== 'POST') { next(); return }
+        try {
+          const { sessionId } = await readRequestBody(req)
+          const session = await validateSession(sessionId)
+          res.setHeader('Cache-Control', 'no-store')
+          sendJson(res, 200, { success: true, sessionId, username: session.username, expiresAt: session.expiresAt })
+        } catch (error) { sendJson(res, error.status || 502, { success: false, msg: error.message }) }
+      })
+
+      server.middlewares.use('/api/jwgl/logout', async (req, res, next) => {
+        if (req.method !== 'POST') { next(); return }
+        try {
+          const { sessionId } = await readRequestBody(req)
+          sessions.delete(sessionId)
+          sendJson(res, 200, { success: true })
+        } catch (error) { sendJson(res, 500, { success: false, msg: error.message }) }
       })
 
       server.middlewares.use('/api/jwgl/evaluate', (req, res, next) => {

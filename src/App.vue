@@ -1,5 +1,5 @@
 <script setup>
-import { computed, defineAsyncComponent, onMounted, onUnmounted, ref } from 'vue'
+import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, watch } from 'vue'
 import {
   BUSINESS_AUTH,
   DEFAULT_DEBUG_URL,
@@ -37,6 +37,7 @@ const debugEnabled = import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEBUG ==
 const DebugPanel = debugEnabled
   ? defineAsyncComponent(() => import('./components/common/DebugPanel.vue'))
   : null
+const TimetablePage = defineAsyncComponent(() => import('./components/common/TimetablePage.vue'))
 
 const activeView = ref(getViewFromHash())
 const routeCourseId = ref(getRouteCourseId())
@@ -106,8 +107,8 @@ function setView(view) {
   }
 
   activeView.value = view
-  if (view === 'debug') {
-    window.location.hash = '#debug'
+  if (view === 'debug' || view === 'timetable') {
+    window.location.hash = `#${view}`
     return
   }
   if (pluginViews.value.has(view)) {
@@ -1151,6 +1152,10 @@ function clearLogs() {
   log('logs:cleared')
 }
 
+watch(activeView, (view) => {
+  if (view === 'study' && bladeToken.value && !userInfo.value && !loadingStudy.value) loadStudyData()
+})
+
 onMounted(() => {
   window.addEventListener('hashchange', syncViewFromHash)
 
@@ -1165,7 +1170,7 @@ onMounted(() => {
   })
 
   // 刷新后若本地仍有未过期的 token，自动恢复会话，免去重新点击登录
-  if (bladeToken.value) {
+  if (bladeToken.value && activeView.value !== 'timetable' && !pluginViews.value.has(activeView.value)) {
     log('auth:restore-session', { storageKey: TOKEN_KEY })
     loadStudyData()
   }
@@ -1335,6 +1340,8 @@ onUnmounted(() => {
         @submit="submitSelectedAssignment"
       />
     </template>
+
+    <TimetablePage v-else-if="activeView === 'timetable'" />
 
     <template v-else-if="pluginViews.has(activeView)">
       <component

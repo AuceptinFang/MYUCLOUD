@@ -3,36 +3,16 @@ export const meta = { name: '评教', view: 'jwgl-eval' }
 </script>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import JwglAuthBar from '../../components/common/JwglAuthBar.vue'
+import { jwglFetch, jwglRequest, jwglSessionId as sessionId, jwglLoggedIn as loggedIn, invalidateJwglSession } from '../../api/jwgl.js'
 
-const JWGL_CREDS_KEY = 'jwgl_creds'
-
-function loadCreds() {
-  try {
-    const raw = localStorage.getItem(JWGL_CREDS_KEY)
-    if (raw) return JSON.parse(raw)
-  } catch { /* ignore */ }
-  return {}
-}
-
-function saveCreds(u, p) {
-  try {
-    localStorage.setItem(JWGL_CREDS_KEY, JSON.stringify({ username: u, password: p }))
-  } catch { /* ignore */ }
-}
-
-const saved = loadCreds()
-const username = ref(saved.username || '')
-const password = ref(saved.password || '')
 const targetScore = ref(85)
 const commentGood = ref('')
 const commentImprove = ref('')
-const sessionId = ref('')
 
-const loggingIn = ref(false)
 const loadingCourses = ref(false)
 const evaluating = ref(false)
-const loginError = ref('')
 const coursesError = ref('')
 const evalError = ref('')
 const steps = ref([])
@@ -49,7 +29,6 @@ const allSelected = computed({
   },
 })
 const selectedCount = computed(() => selectedSet.value.size)
-const loggedIn = computed(() => Boolean(sessionId.value))
 const hasCourses = computed(() => courses.value.length > 0)
 const hasSteps = computed(() => steps.value.length > 0)
 const progressPct = computed(() => {
@@ -78,42 +57,15 @@ const submitDisabled = computed(() => {
   return ''
 })
 
-// ── login ──────────────────────────────────────────────────────────────────
-
-async function doLogin() {
-  loginError.value = ''
-  loggingIn.value = true
-  try {
-    const resp = await fetch('/api/jwgl/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: username.value, password: password.value }),
-    })
-    const data = await resp.json()
-    if (!data.success) { loginError.value = data.msg || '登录失败'; return }
-    saveCreds(username.value, password.value)
-    sessionId.value = data.sessionId
-    await doLoadCourses()
-  } catch (e) {
-    loginError.value = e.message || '网络错误'
-  } finally {
-    loggingIn.value = false
-  }
-}
-
 // ── load courses ───────────────────────────────────────────────────────────
 
 async function doLoadCourses() {
   coursesError.value = ''
   loadingCourses.value = true
   try {
-    const resp = await fetch('/api/jwgl/courses', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId: sessionId.value }),
-    })
-    const data = await resp.json()
-    if (!data.success) { coursesError.value = data.msg || '获取课程失败'; return }
+    const activeSession = sessionId.value
+    const data = await jwglRequest('/api/jwgl/courses')
+    if (activeSession !== sessionId.value) return
     courses.value = data.courses || []
     // auto-select unevaluated courses
     selectedSet.value = new Set(courses.value.filter(c => c.evaluated !== '是').map((c) => c.editLink))
@@ -140,17 +92,13 @@ async function doEvaluate() {
   evalResult.value = null
   evaluating.value = true
   try {
-    const resp = await fetch('/api/jwgl/evaluate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: sessionId.value,
+    const activeSession = sessionId.value
+    const resp = await jwglFetch('/api/jwgl/evaluate', {
         targetScore: targetScore.value,
         comment: commentGood.value,
         commentImprove: commentImprove.value,
         submit: false,
         selectedCourses: [...selectedSet.value],
-      }),
     })
     if (!resp.ok) { const d = await resp.json(); evalError.value = d.msg || `HTTP ${resp.status}`; return }
     const reader = resp.body.getReader()
@@ -166,7 +114,7 @@ async function doEvaluate() {
         if (!line.startsWith('data: ')) continue
         try {
           const e = JSON.parse(line.slice(6))
-          if (e.type === 'error') { evalError.value = e.message; return }
+          if (e.type === 'error') { if (e.code === 401) invalidateJwglSession(activeSession); evalError.value = e.message; return }
           if (e.type === 'done') { evalResult.value = e; doLoadCourses(); return }
           steps.value.push(e)
         } catch { /* skip */ }
@@ -190,12 +138,8 @@ async function doSubmitAll() {
   evalResult.value = null
   evaluating.value = true
   try {
-    const resp = await fetch('/api/jwgl/submit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: sessionId.value,
-      }),
+    const activeSession = sessionId.value
+    const resp = await jwglFetch('/api/jwgl/submit', {
     })
     if (!resp.ok) { const d = await resp.json(); evalError.value = d.msg || `HTTP ${resp.status}`; return }
     const reader = resp.body.getReader()
@@ -211,7 +155,7 @@ async function doSubmitAll() {
         if (!line.startsWith('data: ')) continue
         try {
           const e = JSON.parse(line.slice(6))
-          if (e.type === 'error') { evalError.value = e.message; return }
+          if (e.type === 'error') { if (e.code === 401) invalidateJwglSession(activeSession); evalError.value = e.message; return }
           if (e.type === 'done') { evalResult.value = e; doLoadCourses(); return }
           steps.value.push(e)
         } catch { /* skip */ }
@@ -230,16 +174,15 @@ function resetEval() {
   evalError.value = ''
 }
 
-function doLogout() {
-  sessionId.value = ''
+watch(sessionId, (value) => {
   courses.value = []
   selectedSet.value = new Set()
   steps.value = []
   evalResult.value = null
   evalError.value = ''
-  loginError.value = ''
   coursesError.value = ''
-}
+  if (value) doLoadCourses()
+}, { immediate: true })
 
 function stepIcon(step) {
   if (step.type === 'course-error') return '✕'
@@ -277,19 +220,10 @@ function stepIcon(step) {
         >
           提交
         </button>
-        <button v-if="loggedIn" class="button-secondary" type="button" @click="doLogout">退出</button>
       </div>
     </div>
 
-    <!-- 未登录 -->
-    <div v-if="!loggedIn" class="panel" style="margin-top:12px">
-      <label>学号 <input v-model="username" placeholder="学号" /></label>
-      <label>密码 <input v-model="password" type="password" placeholder="教务密码（默认8位出生日期）" /></label>
-      <button :disabled="loggingIn || !username || !password" class="button-primary" type="button" @click="doLogin">
-        {{ loggingIn ? '登录中…' : '登录教务系统' }}
-      </button>
-      <div v-if="loginError" class="notice error">{{ loginError }}</div>
-    </div>
+    <JwglAuthBar />
 
     <!-- 登录后的所有内容 -->
     <template v-if="loggedIn">

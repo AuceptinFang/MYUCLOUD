@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
+import JsonViewer from './JsonViewer.vue'
 
 const props = defineProps({
   loginUrl: { type: String, default: '' },
@@ -183,11 +184,6 @@ function formatTime(value) {
   if (!value) return '—'
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? value : date.toLocaleTimeString([], { hour12: false })
-}
-
-function toJson(value) {
-  if (typeof value === 'string') return value
-  return JSON.stringify(value ?? null, null, 2)
 }
 </script>
 
@@ -390,7 +386,7 @@ function toJson(value) {
 
             <section v-if="selectedCall.request?.body !== undefined" class="api-data-section">
               <h4>Request Body</h4>
-              <pre class="api-code">{{ toJson(selectedCall.request.body) }}</pre>
+              <JsonViewer :key="`${selectedCall.key}-request`" :value="selectedCall.request.body" />
             </section>
           </div>
 
@@ -437,7 +433,7 @@ function toJson(value) {
 
               <section class="api-data-section">
                 <h4>Response Body</h4>
-                <pre class="api-code response-body">{{ toJson(selectedCall.response.body) }}</pre>
+                <JsonViewer :key="`${selectedCall.key}-response`" :value="selectedCall.response.body" />
               </section>
 
               <section class="api-data-section">

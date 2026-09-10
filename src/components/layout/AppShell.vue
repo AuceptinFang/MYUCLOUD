@@ -35,6 +35,13 @@ const emit = defineEmits(['change-view'])
           首页
         </button>
         <button
+          :class="{ active: activeView === 'timetable' }"
+          type="button"
+          @click="emit('change-view', 'timetable')"
+        >
+          课表
+        </button>
+        <button
           v-for="p in plugins"
           :key="p.view"
           :class="{ active: activeView === p.view }"

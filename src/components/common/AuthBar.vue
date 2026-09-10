@@ -1,5 +1,8 @@
 <script setup>
 defineProps({
+  serviceName: { type: String, default: 'UCloud' },
+  credentialName: { type: String, default: 'Blade-Auth' },
+  loginHint: { type: String, default: '使用统一认证或 Blade-Auth' },
   username: {
     type: String,
     default: '',
@@ -46,7 +49,7 @@ const emit = defineEmits([
       <div class="auth-identity">
         <i class="auth-state-dot" :class="{ ready: authenticated }" aria-hidden="true" />
         <div>
-          <span>{{ authenticated ? '已连接 UCloud' : '尚未登录' }}</span>
+          <span>{{ authenticated ? `已连接 ${serviceName}` : '尚未登录' }}</span>
           <strong>{{ userLabel }}</strong>
         </div>
       </div>
@@ -62,8 +65,8 @@ const emit = defineEmits([
 
     <details class="auth-access" :open="!authenticated">
       <summary>
-        <span>{{ authenticated ? '账户与登录设置' : '登录 UCloud' }}</span>
-        <small>{{ authenticated ? '切换账户或更新凭证' : '使用统一认证或 Blade-Auth' }}</small>
+        <span>{{ authenticated ? '账户与登录设置' : `登录 ${serviceName}` }}</span>
+        <small>{{ authenticated ? '切换账户或更新凭证' : loginHint }}</small>
       </summary>
 
       <div class="auth-methods">
@@ -92,7 +95,7 @@ const emit = defineEmits([
 
         <div class="token-form">
           <label>
-            Blade-Auth
+            {{ credentialName }}
             <input
               :value="token"
               autocomplete="off"
@@ -101,7 +104,7 @@ const emit = defineEmits([
             />
           </label>
           <button :disabled="loadingData || !token" type="button" @click="emit('blade-auth-login')">
-            {{ loadingData ? '加载中' : 'Blade-Auth 登录' }}
+            {{ loadingData ? '加载中' : `${credentialName} 登录` }}
           </button>
           <button class="button-secondary" type="button" @click="emit('clear-token')">清空</button>
         </div>
