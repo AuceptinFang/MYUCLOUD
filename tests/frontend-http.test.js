@@ -44,9 +44,9 @@ test('教务登录遇到静态站点错误页时给出后端提示', async (t) =
 })
 
 test('用户可见错误不包含后端 URL 或上游连接细节', () => {
-  assert.equal(friendlyError(new Error('连接 https://u.aucept.in 失败')), '操作失败，请稍后重试。')
+  assert.equal(friendlyError(new Error('连接 https://myu.aucept.in 失败')), '操作失败，请稍后重试。')
   assert.equal(responseErrorMessage({ status: 502 }, { msg: '无法连接上游服务 jwgl.bupt.edu.cn' }), '服务暂不可用，请稍后重试。')
-  assert.equal(responseErrorMessage({ status: 400 }, { msg: '请求 https://u.aucept.in 失败' }), '请求失败，请稍后重试。')
+  assert.equal(responseErrorMessage({ status: 400 }, { msg: '请求 https://myu.aucept.in 失败' }), '请求失败，请稍后重试。')
 })
 
 test('流式响应开始后不被连接超时中断', async (t) => {

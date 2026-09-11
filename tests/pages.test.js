@@ -14,13 +14,14 @@ test('Pages 构建适配项目子路径，且不包含本地插件、调试页�
   t.after(() => rmSync(outDir, { recursive: true, force: true }))
   await build({ mode: 'pages', logLevel: 'silent', build: { outDir, emptyOutDir: false } })
   const html = readFileSync(join(outDir, 'index.html'), 'utf8')
+  assert.equal(readFileSync(join(outDir, 'CNAME'), 'utf8'), 'u.aucept.in\n')
   assert.match(html, /src="\.\/assets\//)
   assert.doesNotMatch(html, /(?:src|href)="\/assets\//)
   const assets = readdirSync(join(outDir, 'assets'))
   assert.ok(!assets.some((name) => /DebugPanel|local-fonts/.test(name)))
   assert.ok(!readdirSync(outDir).includes('fonts'))
   const code = assets.filter((name) => name.endsWith('.js')).map((name) => readFileSync(join(outDir, 'assets', name), 'utf8')).join('\n')
-  assert.match(code, /https:\/\/u\.aucept\.in/)
+  assert.match(code, /https:\/\/myu\.aucept\.in/)
   assert.doesNotMatch(code, /attendancebasicinfo|attendancedetailinfo|签到/)
 })
 
@@ -80,15 +81,15 @@ test('Pages 默认将登录、业务、视频和 Office 预览指向配置的后
   await jwgl.loginJwgl('student', 'test')
   await ucloud.getUserInfo('token')
   assert.deepEqual(requests.map(({ url }) => url), [
-    'https://u.aucept.in/api/login',
-    'https://u.aucept.in/api/jwgl/login',
-    'https://u.aucept.in/ucloud/ykt-basics/info',
+    'https://myu.aucept.in/api/login',
+    'https://myu.aucept.in/api/jwgl/login',
+    'https://myu.aucept.in/ucloud/ykt-basics/info',
   ])
   const file = 'https://fileucloud.bupt.edu.cn/ucloud/video/test.mp4?signature=a%2Fb'
-  assert.equal(ucloud.buildFileUrl(file), 'https://u.aucept.in/file/ucloud/video/test.mp4?signature=a%2Fb')
-  assert.match(ucloud.buildPreviewUrl({ previewUrl: file }), /^https:\/\/u\.aucept\.in\/office\//)
+  assert.equal(ucloud.buildFileUrl(file), 'https://myu.aucept.in/file/ucloud/video/test.mp4?signature=a%2Fb')
+  assert.match(ucloud.buildPreviewUrl({ previewUrl: file }), /^https:\/\/myu\.aucept\.in\/office\//)
   const { default: AuthBar } = await server.ssrLoadModule('/src/components/common/AuthBar.vue')
   const html = await renderToString(createSSRApp(AuthBar, { loginAction: '/api/jwgl/login', credentialScope: 'jwgl' }))
-  assert.match(html, /action="https:\/\/u\.aucept\.in\/api\/jwgl\/login"/)
+  assert.match(html, /action="https:\/\/myu\.aucept\.in\/api\/jwgl\/login"/)
   assert.doesNotMatch(html, /id="jwgl-password"[^>]*disabled/)
 })

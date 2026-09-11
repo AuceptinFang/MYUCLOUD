@@ -1,6 +1,6 @@
 import { cors } from 'hono/cors'
 
-export const DEFAULT_ALLOWED_ORIGINS = ['https://auceptinfang.github.io']
+export const DEFAULT_ALLOWED_ORIGINS = ['https://u.aucept.in', 'https://auceptinfang.github.io']
 
 export function backendCors(origins = DEFAULT_ALLOWED_ORIGINS) {
   const values = typeof origins === 'string' ? origins.split(',') : origins

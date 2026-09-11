@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createBackend } from '../server/app.js'
 
-const origin = 'https://auceptinfang.github.io'
+const origin = 'https://u.aucept.in'
 const app = (allowedOrigins) => createBackend({ getSessionStore: () => new Map(), allowedOrigins })
 
 test('Pages 的 JSON、鉴权头和视频 Range 预检由后端处理', async () => {
@@ -28,6 +28,8 @@ test('登录错误也携带 CORS 响应头，其他站点不在允许列表', as
   assert.equal(response.headers.get('Access-Control-Allow-Origin'), origin)
   const denied = await backend.request('/api/login', { method: 'OPTIONS', headers: { Origin: 'https://untrusted.example' } })
   assert.equal(denied.headers.get('Access-Control-Allow-Origin'), null)
+  const github = await backend.request('/api/login', { method: 'OPTIONS', headers: { Origin: 'https://auceptinfang.github.io' } })
+  assert.equal(github.headers.get('Access-Control-Allow-Origin'), 'https://auceptinfang.github.io')
   const custom = await app('https://frontend.example').request('/api/login', { method: 'OPTIONS', headers: { Origin: 'https://frontend.example' } })
   assert.equal(custom.headers.get('Access-Control-Allow-Origin'), 'https://frontend.example')
 })
