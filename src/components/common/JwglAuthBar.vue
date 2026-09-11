@@ -1,15 +1,15 @@
 <script setup>
 import { ref, watch } from 'vue'
 import AuthBar from './AuthBar.vue'
-import { jwglAuthError, jwglLoggedIn, jwglSessionId, jwglStorageWarning, jwglUsername, loginJwgl, logoutJwgl, restoreJwglToken } from '../../api/jwgl.js'
+import { jwglAuthError, jwglLoggedIn, jwglToken, jwglStorageWarning, jwglUsername, loginJwgl, logoutJwgl, restoreJwglToken } from '../../api/jwgl.js'
 
 const emit = defineEmits(['login'])
 const username = ref(jwglUsername.value)
 const password = ref('')
-const token = ref(jwglSessionId.value)
+const token = ref(jwglToken.value)
 const loading = ref(false)
 const error = ref('')
-watch(jwglSessionId, (value) => { token.value = value; if (value) username.value = jwglUsername.value })
+watch(jwglToken, (value) => { token.value = value; if (value) username.value = jwglUsername.value })
 
 async function login(useToken = false) {
   loading.value = true

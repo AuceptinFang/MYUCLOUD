@@ -16,7 +16,8 @@ function restoreCredential() {
   } catch { return null }
 }
 credential.value = restoreCredential()
-export const jwglSessionId = computed(() => credential.value?.sessionId || '')
+export const jwglSessionId = computed(() => credential.value?.sessionKey || credential.value?.sessionId || '')
+export const jwglToken = computed(() => credential.value?.sessionId || '')
 export const jwglUsername = computed(() => credential.value?.username || '')
 export const jwglLoggedIn = computed(() => Boolean(jwglSessionId.value))
 
@@ -30,7 +31,8 @@ function saveCredential(data) {
   if (typeof data.sessionId !== 'string' || !data.sessionId || typeof data.username !== 'string' || !(data.expiresAt > Date.now())) {
     throw new Error('教务登录未返回有效凭证，请重试')
   }
-  credential.value = { sessionId: data.sessionId, username: data.username, expiresAt: data.expiresAt }
+  const sessionKey = typeof data.sessionKey === 'string' && data.sessionKey ? data.sessionKey : data.sessionId
+  credential.value = { sessionId: data.sessionId, sessionKey, username: data.username, expiresAt: data.expiresAt }
   jwglAuthError.value = ''
   jwglStorageWarning.value = ''
   try {
@@ -59,28 +61,38 @@ export const restoreJwglToken = (sessionId) => authRequest('/api/jwgl/session', 
 
 export async function logoutJwgl() {
   const sessionId = jwglSessionId.value
+  const token = jwglToken.value
   invalidateJwglSession(sessionId, '')
   if (sessionId) {
     try {
-      await fetchBackend('/api/jwgl/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId }) })
+      await fetchBackend('/api/jwgl/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: token }) })
     } catch { /* 本地已退出，远程凭证仍受有效期限制 */ }
   }
 }
 
 export async function jwglFetch(path, body = {}, options = {}) {
   const sessionId = jwglSessionId.value
+  const token = jwglToken.value
   if (!sessionId || credential.value.expiresAt <= Date.now()) {
     invalidateJwglSession(sessionId)
     throw new Error('请先登录教务系统')
   }
   const response = await fetchBackend(path, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...body, sessionId }), signal: options.signal,
+    body: JSON.stringify({ ...body, sessionId: token }), signal: options.signal,
   }, { streaming: options.expect === 'sse' })
   if (response.status === 401) {
     await readBackendJson(response)
+    if (sessionId === jwglSessionId.value && token !== jwglToken.value) throw new Error('登录凭证已更新，请重试本次操作。')
     invalidateJwglSession(sessionId)
     throw new Error('教务凭证已过期，请重新登录')
+  }
+  const renewed = response.headers.get('X-Jwgl-Session')
+  if (response.ok && renewed && sessionId === jwglSessionId.value && token === jwglToken.value) {
+    credential.value = { ...credential.value, sessionId: renewed }
+    try { localStorage.setItem(JWGL_AUTH_KEY, JSON.stringify(credential.value)) } catch {
+      jwglStorageWarning.value = '浏览器未能保存更新后的教务凭证，刷新后可能需要重新登录。'
+    }
   }
   if (response.ok && options.expect === 'sse' && !response.headers.get('Content-Type')?.includes('text/event-stream')) {
     throw new Error('服务未返回有效的处理进度，请稍后重试。')

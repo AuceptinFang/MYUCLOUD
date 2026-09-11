@@ -52,7 +52,7 @@ test('浏览器共用凭证、刷新恢复、过期保留课表及旧请求不�
   await rejected
   assert.equal(auth.jwglSessionId.value, 'new-token')
   htmlError = true
-  await assert.rejects(auth.jwglRequest('/api/jwgl/courses'), /服务未返回有效数据/)
+  await assert.rejects(auth.jwglRequest('/api/jwgl/courses'), /服务响应异常/)
   assert.equal(auth.jwglSessionId.value, 'new-token')
   assert.deepEqual(readTimetableCache(localStorage), cached)
   htmlError = false

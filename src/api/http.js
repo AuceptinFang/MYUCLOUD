@@ -1,22 +1,26 @@
 import { BACKEND_ORIGIN, PREVIEW_MESSAGE, STATIC_PREVIEW, backendUrl } from '../utils/runtime.js'
 
-const NETWORK_MESSAGE = BACKEND_ORIGIN
-  ? `无法连接后端 ${BACKEND_ORIGIN}，请检查网络或稍后重试。`
-  : '无法连接服务，请检查网络，并确认本地后端已启动。'
-const INVALID_RESPONSE_MESSAGE = '服务未返回有效数据，请确认后端地址正确，或稍后重试。'
+const NETWORK_MESSAGE = '暂时无法连接服务，请稍后重试。'
+const INVALID_RESPONSE_MESSAGE = '服务响应异常，请稍后重试。'
+const backendHostname = BACKEND_ORIGIN ? new URL(BACKEND_ORIGIN).hostname : ''
+
+function publicMessage(message, fallback) {
+  if (typeof message !== 'string' || !message || /https?:\/\//i.test(message)
+    || (backendHostname && message.includes(backendHostname))) return fallback
+  return message
+}
 
 export function friendlyError(error, fallback = '操作失败，请稍后重试。') {
   if (error?.name === 'TimeoutError') return '请求超时，请稍后重试。'
   if (error?.name === 'AbortError') return '请求已中断，请稍后重试。'
   if (error instanceof TypeError) return NETWORK_MESSAGE
   if (error instanceof SyntaxError) return INVALID_RESPONSE_MESSAGE
-  return error?.message || fallback
+  return publicMessage(error?.message, fallback)
 }
 
 export function responseErrorMessage(response, body, label = '请求') {
-  if (response.status === 404 || response.status === 405) return '后端接口不可用，请确认服务已启动且地址正确。'
-  if (typeof body?.msg === 'string' && body.msg && !/^(fetch failed|failed to fetch|networkerror|unexpected token|unexpected end)/i.test(body.msg)) return body.msg
-  if (response.status >= 500) return '后端服务暂不可用，请稍后重试。'
+  if (response.status === 404 || response.status === 405 || response.status >= 500) return '服务暂不可用，请稍后重试。'
+  if (typeof body?.msg === 'string' && body.msg && !/^(fetch failed|failed to fetch|networkerror|unexpected token|unexpected end)/i.test(body.msg)) return publicMessage(body.msg, `${label}失败，请稍后重试。`)
   if (response.status === 401) return '登录已失效，请重新登录。'
   if (response.status === 403) return '没有访问权限，请确认登录账号。'
   return `${label}失败，请稍后重试。`

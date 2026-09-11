@@ -6,7 +6,7 @@ import { loginJwgl } from '../src/api/jwgl.js'
 
 test('网络故障转换为可理解的提示，调用者主动取消仍可识别', async (t) => {
   t.mock.method(globalThis, 'fetch', async () => { throw new TypeError('Failed to fetch') })
-  await assert.rejects(fetchBackend('/api/login'), /无法连接服务.*后端已启动/)
+  await assert.rejects(fetchBackend('/api/login'), /暂时无法连接服务，请稍后重试/)
   await assert.rejects(getUserInfo('test-token'), /无法连接服务/)
   const controller = new AbortController()
   controller.abort()
@@ -24,7 +24,7 @@ test('HTML 错误页和错误后端地址不暴露 JSON 解析异常', async () 
       return true
     })
   }
-  await assert.rejects(readBackendJson(new Response('null')), /有效数据/)
+  await assert.rejects(readBackendJson(new Response('null')), /服务响应异常/)
   const debug = await readResponse(new Response('<html>debug content</html>'), { allowText: true })
   assert.equal(debug.body, '<html>debug content</html>')
 })
@@ -33,14 +33,20 @@ test('保留账号和业务错误，不误报为网络故障', async (t) => {
   const body = { success: false, msg: '教务密码错误' }
   t.mock.method(globalThis, 'fetch', async () => Response.json(body, { status: 401 }))
   await assert.rejects(loginJwgl('student', 'wrong'), /教务密码错误/)
-  assert.equal(responseErrorMessage({ status: 503 }, null), '后端服务暂不可用，请稍后重试。')
-  assert.equal(responseErrorMessage({ status: 500 }, { msg: 'fetch failed' }), '后端服务暂不可用，请稍后重试。')
+  assert.equal(responseErrorMessage({ status: 503 }, null), '服务暂不可用，请稍后重试。')
+  assert.equal(responseErrorMessage({ status: 500 }, { msg: 'fetch failed' }), '服务暂不可用，请稍后重试。')
   assert.throws(() => assertUcloudOk({ ok: true, status: 200, body: { success: false, msg: '附件已删除' } }, '预览'), /附件已删除/)
 })
 
 test('教务登录遇到静态站点错误页时给出后端提示', async (t) => {
   t.mock.method(globalThis, 'fetch', async () => new Response('<html>Not Found</html>', { status: 404 }))
-  await assert.rejects(loginJwgl('student', 'test'), /后端接口不可用/)
+  await assert.rejects(loginJwgl('student', 'test'), /服务暂不可用/)
+})
+
+test('用户可见错误不包含后端 URL 或上游连接细节', () => {
+  assert.equal(friendlyError(new Error('连接 https://u.pub.aucept.in 失败')), '操作失败，请稍后重试。')
+  assert.equal(responseErrorMessage({ status: 502 }, { msg: '无法连接上游服务 jwgl.bupt.edu.cn' }), '服务暂不可用，请稍后重试。')
+  assert.equal(responseErrorMessage({ status: 400 }, { msg: '请求 https://u.pub.aucept.in 失败' }), '请求失败，请稍后重试。')
 })
 
 test('流式响应开始后不被连接超时中断', async (t) => {
