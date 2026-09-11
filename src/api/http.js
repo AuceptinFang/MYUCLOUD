@@ -1,6 +1,8 @@
-import { PREVIEW_MESSAGE, STATIC_PREVIEW } from '../utils/runtime.js'
+import { BACKEND_ORIGIN, PREVIEW_MESSAGE, STATIC_PREVIEW, backendUrl } from '../utils/runtime.js'
 
-const NETWORK_MESSAGE = '无法连接服务，请检查网络，并确认本地后端已启动。'
+const NETWORK_MESSAGE = BACKEND_ORIGIN
+  ? `无法连接后端 ${BACKEND_ORIGIN}，请检查网络或稍后重试。`
+  : '无法连接服务，请检查网络，并确认本地后端已启动。'
 const INVALID_RESPONSE_MESSAGE = '服务未返回有效数据，请确认后端地址正确，或稍后重试。'
 
 export function friendlyError(error, fallback = '操作失败，请稍后重试。') {
@@ -28,7 +30,7 @@ export async function fetchBackend(url, options = {}, { timeoutMs = 30000, strea
   const timer = streaming ? setTimeout(() => headersTimeout.abort(new DOMException('timeout', 'TimeoutError')), timeoutMs) : null
   const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout
   try {
-    return await fetch(url, { ...options, signal })
+    return await fetch(backendUrl(url), { ...options, signal })
   } catch (error) {
     if (options.signal?.aborted) throw error
     throw new Error(friendlyError(timeout.aborted ? timeout.reason : error), { cause: error })

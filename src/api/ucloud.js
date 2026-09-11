@@ -1,4 +1,5 @@
 import { fetchBackend, readBackendPayload, responseErrorMessage } from './http.js'
+import { backendUrl } from '../utils/runtime.js'
 
 export const TOKEN_KEY = 'mock-ucloud-blade-auth'
 export const DEFAULT_LOGIN_URL = '/api/login'
@@ -321,9 +322,9 @@ export function isVideoResource({ previewUrl = '', ext = '', mimeType = '', name
     || videoExtension.test(previewUrl.split(/[?#]/, 1)[0])
 }
 
-// 保留路径和查询参数，文件请求经同源代理设置来源头。
+// 保留路径和查询参数，由配置的后端代理设置来源头。
 export function buildFileUrl(url = '') {
-  return url.replace(/^https?:\/\/fileucloud\.bupt\.edu\.cn(?=\/)/i, '/file')
+  return backendUrl(url.replace(/^https?:\/\/fileucloud\.bupt\.edu\.cn(?=\/)/i, '/file'))
 }
 
 // 把后端返回的 onlinePreview / previewUrl 拼成本站可直开的预览地址。
@@ -336,7 +337,7 @@ export function buildPreviewUrl({ previewUrl, onlinePreview } = {}) {
     onlinePreview || 'https://ucloud.bupt.edu.cn/office/?ssl=1&n=1&bclr=000&furl='
   ).replace('https://ucloud.bupt.edu.cn', '')
 
-  return `${base}${encodeURIComponent(previewUrl)}`
+  return backendUrl(`${base}${encodeURIComponent(previewUrl)}`)
 }
 
 export async function getResourcePreviewUrl(token, resourceId) {

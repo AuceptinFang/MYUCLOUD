@@ -1,4 +1,4 @@
-name: Frontend preview
+name: Frontend Pages
 
 on:
   push:
@@ -23,8 +23,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-      - name: Build static preview
+      - name: Build Pages frontend
         run: npm run build:pages
+        env:
+          VITE_BACKEND_URL: ${{ vars.VITE_BACKEND_URL || 'https://u.pub.aucept.in' }}
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         with:
           path: dist
@@ -39,6 +41,6 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Deploy frontend preview
+      - name: Deploy Pages frontend
         id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5

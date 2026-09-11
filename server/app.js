@@ -4,14 +4,16 @@ import { createJwglService } from './services/jwgl.js'
 import { loginUcloud } from './services/ucloud.js'
 import { createJwglRoutes } from './routes/jwgl.js'
 import { mountProxyRoutes, PROXY_RULES } from './routes/proxy.js'
+import { backendCors } from './cors.js'
 
 export function isBackendPath(path) {
   return ['/api', ...PROXY_RULES.map((rule) => rule.prefix)]
     .some((prefix) => path === prefix || path.startsWith(`${prefix}/`))
 }
 
-export function createBackend({ getSessionStore }) {
+export function createBackend({ getSessionStore, allowedOrigins }) {
   const app = new Hono()
+  app.use('*', backendCors(allowedOrigins))
   app.use('/api/*', async (c, next) => {
     c.header('Cache-Control', 'no-store')
     await next()

@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
+import { backendUrl } from '../../utils/runtime.js'
 import JsonViewer from './JsonViewer.vue'
 
 const props = defineProps({
@@ -231,7 +232,7 @@ function formatTime(value) {
         <form
           id="ucloud-debug-login-form"
           name="ucloud-login"
-          :action="loginUrl"
+          :action="backendUrl(loginUrl)"
           method="post"
           class="debug-auth-section"
           @submit.prevent="emit('login')"

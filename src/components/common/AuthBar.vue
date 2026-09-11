@@ -1,5 +1,5 @@
 <script setup>
-import { STATIC_PREVIEW } from '../../utils/runtime.js'
+import { STATIC_PREVIEW, backendUrl } from '../../utils/runtime.js'
 defineProps({
   serviceName: { type: String, default: 'UCloud' },
   credentialName: { type: String, default: 'Blade-Auth' },
@@ -77,7 +77,7 @@ const emit = defineEmits([
         <form
           :id="`${credentialScope}-login-form`"
           :name="`${credentialScope}-login`"
-          :action="loginAction"
+          :action="backendUrl(loginAction)"
           method="post"
           class="auth-form"
           @submit.prevent="!STATIC_PREVIEW && emit('login')"

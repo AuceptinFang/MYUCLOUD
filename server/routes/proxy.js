@@ -25,7 +25,12 @@ export function mountProxyRoutes(app) {
         for (const name of ['Authorization', 'Blade-Auth', 'Tenant-Id']) request.headers.delete(name)
       }
       try {
-        return await proxy(target, { raw: request, redirect: 'manual', strictConnectionProcessing: true })
+        const response = await proxy(target, { raw: request, redirect: 'manual', strictConnectionProcessing: true })
+        // 学校的 CORS 规则由本后端面向前端的规则替换。
+        for (const name of [...response.headers.keys()]) {
+          if (name.startsWith('access-control-')) response.headers.delete(name)
+        }
+        return response
       } catch (error) {
         if (error.status) throw error
         throw new ApiError(502, `无法连接上游服务 ${target.hostname}`)
