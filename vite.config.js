@@ -6,11 +6,13 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 import { backendPlugin } from './vite.backend.js'
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
+  base: mode === 'pages' ? './' : '/',
+  publicDir: mode === 'pages' ? false : 'public',
   plugins: [
-    backendPlugin(),
+    ...(mode === 'pages' ? [] : [backendPlugin()]),
     vue(),
-    vueDevTools(),
+    ...(mode === 'pages' ? [] : [vueDevTools()]),
   ],
   server: {
     fs: {
@@ -23,4 +25,4 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url))
     },
   },
-})
+}))

@@ -1,4 +1,6 @@
 import { computed, ref } from 'vue'
+import { fetchBackend, readBackendJson, responseErrorMessage } from './http.js'
+import { STATIC_PREVIEW } from '../utils/runtime.js'
 
 export const JWGL_AUTH_KEY = 'mock-ucloud-jwgl-auth'
 const credential = ref(null)
@@ -6,6 +8,7 @@ export const jwglAuthError = ref('')
 export const jwglStorageWarning = ref('')
 
 function restoreCredential() {
+  if (STATIC_PREVIEW) return null
   try {
     const saved = JSON.parse(localStorage.getItem(JWGL_AUTH_KEY) || 'null')
     return saved && typeof saved.sessionId === 'string' && saved.sessionId
@@ -44,9 +47,9 @@ export function invalidateJwglSession(expectedId = jwglSessionId.value, message 
 }
 
 async function authRequest(path, body) {
-  const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-  const data = await response.json()
-  if (!response.ok || !data.success) throw new Error(data.msg || '教务登录失败')
+  const response = await fetchBackend(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  const data = await readBackendJson(response)
+  if (!response.ok || !data.success) throw new Error(responseErrorMessage(response, data, '教务登录'))
   saveCredential(data)
   return data
 }
@@ -59,7 +62,7 @@ export async function logoutJwgl() {
   invalidateJwglSession(sessionId, '')
   if (sessionId) {
     try {
-      await fetch('/api/jwgl/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId }) })
+      await fetchBackend('/api/jwgl/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId }) })
     } catch { /* 本地已退出，远程凭证仍受有效期限制 */ }
   }
 }
@@ -70,20 +73,24 @@ export async function jwglFetch(path, body = {}, options = {}) {
     invalidateJwglSession(sessionId)
     throw new Error('请先登录教务系统')
   }
-  const response = await fetch(path, {
+  const response = await fetchBackend(path, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ...body, sessionId }), signal: options.signal,
-  })
+  }, { streaming: options.expect === 'sse' })
   if (response.status === 401) {
+    await readBackendJson(response)
     invalidateJwglSession(sessionId)
     throw new Error('教务凭证已过期，请重新登录')
+  }
+  if (response.ok && options.expect === 'sse' && !response.headers.get('Content-Type')?.includes('text/event-stream')) {
+    throw new Error('服务未返回有效的处理进度，请稍后重试。')
   }
   return response
 }
 
 export async function jwglRequest(path, body, options) {
   const response = await jwglFetch(path, body, options)
-  const data = await response.json()
-  if (!response.ok || !data.success) throw new Error(data.msg || `请求失败 HTTP ${response.status}`)
+  const data = await readBackendJson(response)
+  if (!response.ok || !data.success) throw new Error(responseErrorMessage(response, data))
   return data
 }

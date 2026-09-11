@@ -6,7 +6,26 @@
 
 - 课程列表与详情
 - 作业列表与详情与提交
-- 课表（按周查看、整学期本地缓存）
+- 课表（浏览器本地缓存）
+
+## 使用
+
+GitHub Pages 提供前端界面预览，完整功能需要本地运行后端。
+
+## GitHub Pages 预览
+
+仓库包含 `.github/workflows/pages.yml`：推送到 `master` 后，自动安装依赖、运行测试并构建、发布前端预览。首次使用需要在 GitHub 仓库的 **Settings → Pages → Build and deployment → Source** 中选择 **GitHub Actions**。
+
+Pages 使用独立的 `pages` 模式，资源使用相对路径，适配仓库子路径和自定义域名。预览显示“此预览未连接后端，登录及同步暂不可用”，登录输入和按钮禁用，请求层也会阻止发送凭证及业务请求。该构建不包含本地签到插件、调试页或自行提供的字体。已有的本地课表仍可查看；GitHub Pages 与本机站点属于不同来源，不共享 localStorage。
+
+本地检查同样的静态预览：
+
+```sh
+npm run build:pages
+npm run preview -- --mode pages
+```
+
+`npm run dev`、`npm run build` 与普通 `npm run preview` 继续使用正常的本地应用模式。网络中断、后端接口缺失或返回非 JSON 错误页时，页面会显示可理解的错误；附件预览和下载失败会提示并恢复按钮状态，不会清空已保存课表。
 
 ## 课表与教务登录
 

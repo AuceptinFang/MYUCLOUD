@@ -1,14 +1,3 @@
-/* Microsoft YaHei (微软雅黑) — self-hosted for CJK text.
-   Per-codepoint fallback in the font stacks below routes Latin/English to a
-   monospace font and CJK characters to this YaHei webfont. */
-@font-face {
-  font-family: "Microsoft YaHei";
-  src: url("/fonts/msyh.ttf") format("truetype");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
 :root {
   color-scheme: light;
   --cloud-blue: #315f7d;

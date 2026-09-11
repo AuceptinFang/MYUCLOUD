@@ -1,6 +1,8 @@
 <script setup>
 import { computed, ref } from 'vue'
 import VideoPreview from './VideoPreview.vue'
+import { fetchBackend, friendlyError, responseErrorMessage } from '../../api/http.js'
+import { assertUcloudOk } from '../../api/ucloud.js'
 import {
   TOKEN_KEY,
   buildPreviewUrl,
@@ -145,6 +147,7 @@ function getDepthStyle(row) {
   }
 }
 
+const attachmentError = ref('')
 const previewingId = ref('')
 const videoPreview = ref(null)
 const downloadingId = ref('')
@@ -155,48 +158,50 @@ function getAttachmentResourceId(attachment) {
 }
 
 async function previewAttachment(attachment) {
+  attachmentError.value = ''
   const resourceId = getAttachmentResourceId(attachment)
-  if (!resourceId) return
+  if (!resourceId) { attachmentError.value = '附件信息不完整，暂时无法打开。'; return }
 
   previewingId.value = resourceId
   try {
     const token = localStorage.getItem(TOKEN_KEY)
-    if (!token) return
+    if (!token) throw new Error('请先登录，再访问附件。')
 
     const { result } = await getResourcePreviewUrl(token, resourceId)
-    if (!result.ok || result.body?.code !== 200) return
+    assertUcloudOk(result, '获取附件')
 
     const { previewUrl, onlinePreview } = pickPreviewData(result.body)
-    if (!previewUrl) return
+    if (!previewUrl) throw new Error('暂时无法获取附件地址，请稍后重试。')
     if (isVideoResource({ ...getAttachmentResource(attachment), previewUrl, name: getAttachmentName(attachment) })) {
       videoPreview.value = { url: buildFileUrl(previewUrl), name: getAttachmentName(attachment) }
       return
     }
     const url = buildPreviewUrl({ previewUrl, onlinePreview })
-    if (!url) return
+    if (!url) throw new Error('暂时无法获取预览地址，请稍后重试。')
 
     window.open(url, '_blank', 'noopener')
-  } catch { /* 静默 */ }
+  } catch (error) { attachmentError.value = friendlyError(error) }
   finally { previewingId.value = '' }
 }
 
 async function downloadAttachment(attachment) {
+  attachmentError.value = ''
   const resourceId = getAttachmentResourceId(attachment)
-  if (!resourceId) return
+  if (!resourceId) { attachmentError.value = '附件信息不完整，暂时无法打开。'; return }
 
   downloadingId.value = resourceId
   try {
     const token = localStorage.getItem(TOKEN_KEY)
-    if (!token) return
+    if (!token) throw new Error('请先登录，再访问附件。')
 
     const { result } = await getResourcePreviewUrl(token, resourceId)
-    if (!result.ok || result.body?.code !== 200) return
+    assertUcloudOk(result, '获取附件')
 
     const { previewUrl } = pickPreviewData(result.body)
-    if (!previewUrl) return
+    if (!previewUrl) throw new Error('暂时无法获取附件地址，请稍后重试。')
 
-    const response = await fetch(previewUrl)
-    if (!response.ok) return
+    const response = await fetchBackend(buildFileUrl(previewUrl), {}, { timeoutMs: 120000, streaming: true })
+    if (!response.ok) throw new Error(responseErrorMessage(response, null, '下载'))
 
     const blob = await response.blob()
     const blobUrl = URL.createObjectURL(blob)
@@ -207,8 +212,8 @@ async function downloadAttachment(attachment) {
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(blobUrl)
-  } catch { /* 静默 */ }
-  downloadingId.value = ''
+  } catch (error) { attachmentError.value = friendlyError(error) }
+  finally { downloadingId.value = '' }
 }
 </script>
 
@@ -221,6 +226,7 @@ async function downloadAttachment(attachment) {
     @close="videoPreview = null"
   />
   <section class="section-block resource-panel">
+    <p v-if="attachmentError" class="notice error" role="alert">{{ attachmentError }}</p>
     <div class="section-header">
       <div>
         <h2>课程资料</h2>

@@ -1,5 +1,7 @@
 <script setup>
 import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, watch } from 'vue'
+import { STATIC_PREVIEW } from './utils/runtime.js'
+import { responseErrorMessage } from './api/http.js'
 import {
   BUSINESS_AUTH,
   DEFAULT_DEBUG_URL,
@@ -33,7 +35,7 @@ import { usePlugins } from './plugin/index.js'
 import { normalizeAssignment, sortAssignments } from './utils/deadline'
 
 const ASSIGNMENT_FETCH_SIZE = 9999
-const debugEnabled = import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEBUG === 'true'
+const debugEnabled = import.meta.env.MODE !== 'pages' && (import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEBUG === 'true')
 const DebugPanel = debugEnabled
   ? defineAsyncComponent(() => import('./components/common/DebugPanel.vue'))
   : null
@@ -47,7 +49,7 @@ const pluginViews = computed(() => new Set(plugins.map((p) => p.view)))
 const username = ref('')
 const password = ref('')
 const loginUrl = ref(DEFAULT_LOGIN_URL)
-const bladeToken = ref(localStorage.getItem(TOKEN_KEY) || '')
+const bladeToken = ref(STATIC_PREVIEW ? '' : localStorage.getItem(TOKEN_KEY) || '')
 const apiUrl = ref(DEFAULT_DEBUG_URL)
 const logs = ref([])
 const loggingIn = ref(false)
@@ -543,6 +545,7 @@ function saveBladeToken(nextToken, source) {
 }
 
 async function login() {
+  if (STATIC_PREVIEW) return
   loggingIn.value = true
   studyError.value = ''
 
@@ -558,12 +561,7 @@ async function login() {
 
     const nextToken = pickToken(result.body)
     if (!nextToken) {
-      const detail = result.body?.error || {}
-      const reason = [result.body?.stage, detail.code, detail.hostname].filter(Boolean).join(' · ')
-      studyError.value = [result.body?.msg || `登录接口返回 HTTP ${result.status}`, reason]
-        .filter(Boolean)
-        .join('（')
-      if (reason) studyError.value += '）'
+      studyError.value = responseErrorMessage(result, result.body, '登录')
 
       log('auth:no-token-found', {
         triedFields: [
@@ -594,6 +592,7 @@ async function login() {
 }
 
 async function loginWithBladeAuth() {
+  if (STATIC_PREVIEW) return
   const nextToken = normalizeBladeTokenInput(bladeToken.value)
 
   if (!nextToken) {
@@ -607,6 +606,7 @@ async function loginWithBladeAuth() {
 }
 
 async function loadStudyData() {
+  if (STATIC_PREVIEW) return
   if (!bladeToken.value) {
     studyError.value = '需要先登录或粘贴 Blade-Auth'
     return

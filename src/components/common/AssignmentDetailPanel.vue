@@ -1,6 +1,8 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import VideoPreview from './VideoPreview.vue'
+import { fetchBackend, friendlyError, responseErrorMessage } from '../../api/http.js'
+import { assertUcloudOk } from '../../api/ucloud.js'
 import { BUSINESS_AUTH, TENANT_ID, TOKEN_KEY, buildPreviewUrl, buildFileUrl, isVideoResource, getResourcePreviewUrl, pickPreviewData } from '../../api/ucloud'
 
 const props = defineProps({
@@ -48,6 +50,7 @@ const fileInput = ref(null)
 const pickedFiles = ref([])
 const assignmentContent = ref('')
 const resourceCount = computed(() => props.resources.length)
+const attachmentError = ref('')
 const previewingId = ref('')
 const videoPreview = ref(null)
 const downloadingId = ref('')
@@ -230,49 +233,51 @@ function getItemResourceId(item) {
 }
 
 async function previewResource(resource) {
+  attachmentError.value = ''
   const resourceId = getItemResourceId(resource)
-  if (!resourceId) return
+  if (!resourceId) { attachmentError.value = '附件信息不完整，暂时无法打开。'; return }
 
   previewingId.value = resourceId
   try {
     const token = localStorage.getItem(TOKEN_KEY)
-    if (!token) return
+    if (!token) throw new Error('请先登录，再访问附件。')
 
     const { result } = await getResourcePreviewUrl(token, resourceId)
-    if (!result.ok || result.body?.code !== 200) return
+    assertUcloudOk(result, '获取附件')
 
     const { previewUrl, onlinePreview } = pickPreviewData(result.body)
-    if (!previewUrl) return
+    if (!previewUrl) throw new Error('暂时无法获取附件地址，请稍后重试。')
     if (isVideoResource({ ...getFileResource(resource), previewUrl, name: getResourceName(resource) })) {
       videoPreview.value = { url: buildFileUrl(previewUrl), name: getResourceName(resource) }
       return
     }
 
     const url = buildPreviewUrl({ previewUrl, onlinePreview })
-    if (!url) return
+    if (!url) throw new Error('暂时无法获取预览地址，请稍后重试。')
 
     window.open(url, '_blank', 'noopener')
-  } catch { /* 静默 */ }
+  } catch (error) { attachmentError.value = friendlyError(error) }
   finally { previewingId.value = '' }
 }
 
 async function downloadFile(resource) {
+  attachmentError.value = ''
   const resourceId = getItemResourceId(resource)
-  if (!resourceId) return
+  if (!resourceId) { attachmentError.value = '附件信息不完整，暂时无法打开。'; return }
 
   downloadingId.value = resourceId
   try {
     const token = localStorage.getItem(TOKEN_KEY)
-    if (!token) return
+    if (!token) throw new Error('请先登录，再访问附件。')
 
     const { result } = await getResourcePreviewUrl(token, resourceId)
-    if (!result.ok || result.body?.code !== 200) return
+    assertUcloudOk(result, '获取附件')
 
     const { previewUrl } = pickPreviewData(result.body)
-    if (!previewUrl) return
+    if (!previewUrl) throw new Error('暂时无法获取附件地址，请稍后重试。')
 
-    const response = await fetch(previewUrl)
-    if (!response.ok) return
+    const response = await fetchBackend(buildFileUrl(previewUrl), {}, { timeoutMs: 120000, streaming: true })
+    if (!response.ok) throw new Error(responseErrorMessage(response, null, '下载'))
 
     const blob = await response.blob()
     const blobUrl = URL.createObjectURL(blob)
@@ -283,8 +288,8 @@ async function downloadFile(resource) {
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(blobUrl)
-  } catch { /* 静默 */ }
-  downloadingId.value = ''
+  } catch (error) { attachmentError.value = friendlyError(error) }
+  finally { downloadingId.value = '' }
 }
 
 async function downloadResource(resource) {
@@ -296,7 +301,7 @@ async function downloadResource(resource) {
 
   if (isApiUrl) {
     const token = localStorage.getItem(TOKEN_KEY)
-    const response = await fetch(url, {
+    const response = await fetchBackend(url, {
       headers: {
         'Blade-Auth': token,
         Authorization: BUSINESS_AUTH,
@@ -321,7 +326,7 @@ async function downloadResource(resource) {
   }
 
   if (isFileProxy) {
-    const response = await fetch(url)
+    const response = await fetchBackend(url)
 
     if (!response.ok) {
       throw new Error(`下载失败 HTTP ${response.status}`)
@@ -379,6 +384,7 @@ function submitAssignment() {
     @close="videoPreview = null"
   />
   <section class="section-block assignment-detail-panel">
+    <p v-if="attachmentError" class="notice error" role="alert">{{ attachmentError }}</p>
     <div class="section-header">
       <div>
         <h2>作业内容</h2>

@@ -1,3 +1,5 @@
+import { fetchBackend, readBackendPayload, responseErrorMessage } from './http.js'
+
 export const TOKEN_KEY = 'mock-ucloud-blade-auth'
 export const DEFAULT_LOGIN_URL = '/api/login'
 export const DEFAULT_DEBUG_URL = '/ucloud/ykt-basics/info'
@@ -17,18 +19,8 @@ const API_PATHS = {
   resourcePreviewUrl: '/ucloud/blade-source/resource/preview-url',
 }
 
-function parseBody(text) {
-  if (!text) return null
-
-  try {
-    return JSON.parse(text)
-  } catch {
-    return text
-  }
-}
-
-export async function readResponse(response) {
-  const rawText = await response.text()
+export async function readResponse(response, options) {
+  const { rawText, body } = await readBackendPayload(response, options)
 
   return {
     ok: response.ok,
@@ -38,7 +30,7 @@ export async function readResponse(response) {
     redirected: response.redirected,
     headers: Object.fromEntries(response.headers.entries()),
     rawText,
-    body: parseBody(rawText),
+    body,
   }
 }
 
@@ -54,11 +46,11 @@ export function businessHeaders(token, extra = {}) {
 
 export function assertUcloudOk(result, label) {
   if (!result.ok) {
-    throw new Error(`${label} HTTP ${result.status}`)
+    throw new Error(responseErrorMessage(result, result.body, label))
   }
 
-  if (result.body?.code && result.body.code !== 200) {
-    throw new Error(result.body?.msg || `${label} code ${result.body.code}`)
+  if (result.body?.success === false || (result.body?.code && result.body.code !== 200)) {
+    throw new Error(responseErrorMessage(result, result.body, label))
   }
 }
 
@@ -74,7 +66,7 @@ export async function loginWithCredentials({ loginUrl = DEFAULT_LOGIN_URL, usern
       password,
     },
   }
-  const response = await fetch(loginUrl, {
+  const response = await fetchBackend(loginUrl, {
     method: 'POST',
     headers: request.headers,
     body: JSON.stringify(request.body),
@@ -114,7 +106,7 @@ export async function getUserInfo(token) {
     method: 'GET',
     headers: businessHeaders(token),
   }
-  const response = await fetch(request.url, {
+  const response = await fetchBackend(request.url, {
     headers: request.headers,
   })
 
@@ -136,7 +128,7 @@ export async function getStudentCourses(token, userId) {
     method: 'GET',
     headers: businessHeaders(token),
   }
-  const response = await fetch(request.url, {
+  const response = await fetchBackend(request.url, {
     headers: request.headers,
   })
 
@@ -161,7 +153,7 @@ export async function getAssignments(token, { current = 1, size = 100, siteId = 
     headers: businessHeaders(token, { 'Content-Type': 'application/json' }),
     body,
   }
-  const response = await fetch(request.url, {
+  const response = await fetchBackend(request.url, {
     method: request.method,
     headers: request.headers,
     body: JSON.stringify(request.body),
@@ -184,7 +176,7 @@ export async function getCourseResources(token, { siteId, userId }) {
     headers: businessHeaders(token, { 'Content-Type': 'application/json' }),
     body: {},
   }
-  const response = await fetch(request.url, {
+  const response = await fetchBackend(request.url, {
     method: request.method,
     headers: request.headers,
     body: JSON.stringify(request.body),
@@ -205,7 +197,7 @@ export async function getAssignmentDetail(token, assignmentId) {
     method: 'GET',
     headers: businessHeaders(token),
   }
-  const response = await fetch(request.url, {
+  const response = await fetchBackend(request.url, {
     method: request.method,
     headers: request.headers,
   })
@@ -225,7 +217,7 @@ export async function getResourcesById(token, resourceId) {
     method: 'GET',
     headers: businessHeaders(token),
   }
-  const response = await fetch(request.url, {
+  const response = await fetchBackend(request.url, {
     method: request.method,
     headers: request.headers,
   })
@@ -243,7 +235,7 @@ export async function submitAssignment(token, payload) {
     headers: businessHeaders(token, { 'Content-Type': 'application/json' }),
     body: payload,
   }
-  const response = await fetch(request.url, {
+  const response = await fetchBackend(request.url, {
     method: request.method,
     headers: request.headers,
     body: JSON.stringify(request.body),
@@ -264,7 +256,7 @@ export async function getAssignmentSubmitView(token, assignmentId) {
     method: 'GET',
     headers: businessHeaders(token),
   }
-  const response = await fetch(request.url, {
+  const response = await fetchBackend(request.url, {
     method: request.method,
     headers: request.headers,
   })
@@ -298,7 +290,7 @@ export async function uploadBusinessResource(token, { file, userId, bizType = 3 
       bizType: String(bizType),
     },
   }
-  const response = await fetch(request.url, {
+  const response = await fetchBackend(request.url, {
     method: request.method,
     headers: request.headers,
     body: formData,
@@ -336,7 +328,7 @@ export function buildFileUrl(url = '') {
 
 // 把后端返回的 onlinePreview / previewUrl 拼成本站可直开的预览地址。
 // onlinePreview 形如 https://ucloud.bupt.edu.cn/office/?ssl=1&n=1&bclr=000&furl=
-// 经 Vite /office 代理转发，绕开 course.html 的强制登录与跨域。
+// 经后端 /office 代理转发，绕开 course.html 的强制登录与跨域。
 export function buildPreviewUrl({ previewUrl, onlinePreview } = {}) {
   if (!previewUrl) return ''
 
@@ -354,7 +346,7 @@ export async function getResourcePreviewUrl(token, resourceId) {
     method: 'GET',
     headers: businessHeaders(token),
   }
-  const response = await fetch(request.url, {
+  const response = await fetchBackend(request.url, {
     method: request.method,
     headers: request.headers,
   })
@@ -371,13 +363,13 @@ export async function sendDebugRequest(token, url) {
     method: 'GET',
     headers: businessHeaders(token),
   }
-  const response = await fetch(request.url, {
+  const response = await fetchBackend(request.url, {
     method: request.method,
     headers: request.headers,
   })
 
   return {
     request,
-    result: await readResponse(response),
+    result: await readResponse(response, { allowText: true }),
   }
 }

@@ -4,6 +4,7 @@ export const meta = { name: '评教', view: 'jwgl-eval' }
 
 <script setup>
 import { computed, ref, watch } from 'vue'
+import { readBackendJson, responseErrorMessage } from '../../api/http.js'
 import JwglAuthBar from '../../components/common/JwglAuthBar.vue'
 import { jwglFetch, jwglRequest, jwglSessionId as sessionId, jwglLoggedIn as loggedIn, invalidateJwglSession } from '../../api/jwgl.js'
 
@@ -99,8 +100,8 @@ async function doEvaluate() {
         commentImprove: commentImprove.value,
         submit: false,
         selectedCourses: [...selectedSet.value],
-    })
-    if (!resp.ok) { const d = await resp.json(); evalError.value = d.msg || `HTTP ${resp.status}`; return }
+    }, { expect: 'sse' })
+    if (!resp.ok) { const d = await readBackendJson(resp); evalError.value = responseErrorMessage(resp, d); return }
     const reader = resp.body.getReader()
     const decoder = new TextDecoder()
     let buffer = ''
@@ -140,8 +141,8 @@ async function doSubmitAll() {
   try {
     const activeSession = sessionId.value
     const resp = await jwglFetch('/api/jwgl/submit', {
-    })
-    if (!resp.ok) { const d = await resp.json(); evalError.value = d.msg || `HTTP ${resp.status}`; return }
+    }, { expect: 'sse' })
+    if (!resp.ok) { const d = await readBackendJson(resp); evalError.value = responseErrorMessage(resp, d); return }
     const reader = resp.body.getReader()
     const decoder = new TextDecoder()
     let buffer = ''

@@ -24,10 +24,12 @@ test('浏览器共用凭证、刷新恢复、过期保留课表及旧请求不�
   let expired = false
   let loginFailed = false
   let offline = false
+  let htmlError = false
   let resolveOld
   t.mock.method(globalThis, 'fetch', async (path, options) => {
     calls.push({ path, body: JSON.parse(options.body) })
     if (offline) throw new TypeError('Failed to fetch')
+    if (htmlError) return new Response('<html>gateway unavailable</html>', { status: 401 })
     if (path === '/api/jwgl/login' && loginFailed) return Response.json({ success: false, msg: '登录失败' }, { status: 401 })
     if (path === '/api/jwgl/login') return Response.json({ success: true, sessionId: token, username: 'student', expiresAt: Date.now() + 60000 })
     if (path === '/api/jwgl/pending') return new Promise((resolve) => { resolveOld = resolve })
@@ -49,6 +51,11 @@ test('浏览器共用凭证、刷新恢复、过期保留课表及旧请求不�
   resolveOld(new Response('{}', { status: 401 }))
   await rejected
   assert.equal(auth.jwglSessionId.value, 'new-token')
+  htmlError = true
+  await assert.rejects(auth.jwglRequest('/api/jwgl/courses'), /服务未返回有效数据/)
+  assert.equal(auth.jwglSessionId.value, 'new-token')
+  assert.deepEqual(readTimetableCache(localStorage), cached)
+  htmlError = false
   expired = true
   await assert.rejects(auth.jwglRequest('/api/jwgl/courses'), /过期/)
   assert.equal(auth.jwglLoggedIn.value, false)
@@ -58,7 +65,7 @@ test('浏览器共用凭证、刷新恢复、过期保留课表及旧请求不�
   await assert.rejects(auth.loginJwgl('student', 'wrong-password'), /登录失败/)
   assert.deepEqual(readTimetableCache(localStorage), cached)
   offline = true
-  await assert.rejects(auth.loginJwgl('student', 'password'), /Failed to fetch/)
+  await assert.rejects(auth.loginJwgl('student', 'password'), /无法连接服务/)
   const afterReload = await import('../src/api/jwgl.js?offline')
   assert.equal(afterReload.jwglLoggedIn.value, false)
   assert.deepEqual(readTimetableCache(localStorage), cached)

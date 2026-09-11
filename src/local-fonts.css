@@ -1,0 +1,8 @@
+/* 本地自行提供的字体；公开预览使用系统字体。 */
+@font-face {
+  font-family: "Microsoft YaHei";
+  src: url("/fonts/msyh.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}

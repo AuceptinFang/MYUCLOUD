@@ -1,5 +1,6 @@
 <script setup>
 import UcloudCreatures from '../common/UcloudCreatures.vue'
+import { PREVIEW_MESSAGE, STATIC_PREVIEW } from '../../utils/runtime.js'
 
 defineProps({
   activeView: {
@@ -61,6 +62,7 @@ const emit = defineEmits(['change-view'])
       </nav>
     </header>
 
+    <p v-if="STATIC_PREVIEW" class="notice" role="status">{{ PREVIEW_MESSAGE }}</p>
     <slot />
   </main>
 </template>

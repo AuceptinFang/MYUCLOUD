@@ -1,4 +1,6 @@
-const modules = import.meta.glob("./*/index.vue", { eager: true })
+const modules = import.meta.env.MODE === 'pages'
+  ? import.meta.glob('./jwgl-eval/index.vue', { eager: true })
+  : import.meta.glob('./*/index.vue', { eager: true })
 
 export function usePlugins() {
   const plugins = []

@@ -1,4 +1,5 @@
 <script setup>
+import { STATIC_PREVIEW } from '../../utils/runtime.js'
 defineProps({
   serviceName: { type: String, default: 'UCloud' },
   credentialName: { type: String, default: 'Blade-Auth' },
@@ -79,7 +80,7 @@ const emit = defineEmits([
           :action="loginAction"
           method="post"
           class="auth-form"
-          @submit.prevent="emit('login')"
+          @submit.prevent="!STATIC_PREVIEW && emit('login')"
         >
           <label>
             学号
@@ -87,6 +88,7 @@ const emit = defineEmits([
               :id="`${credentialScope}-username`"
               :name="`${credentialScope}-username`"
               :value="username"
+              :disabled="STATIC_PREVIEW"
               :autocomplete="`section-${credentialScope} username`"
               @input="emit('update:username', $event.target.value)"
             />
@@ -97,12 +99,13 @@ const emit = defineEmits([
               :id="`${credentialScope}-password`"
               :name="`${credentialScope}-password`"
               :value="password"
+              :disabled="STATIC_PREVIEW"
               :autocomplete="`section-${credentialScope} current-password`"
               type="password"
               @input="emit('update:password', $event.target.value)"
             />
           </label>
-          <button :disabled="loadingLogin" type="submit">
+          <button :disabled="STATIC_PREVIEW || loadingLogin" type="submit">
             {{ loadingLogin ? '登录中' : '登录' }}
           </button>
         </form>
@@ -114,15 +117,16 @@ const emit = defineEmits([
               :id="`${credentialScope}-token`"
               :name="`${credentialScope}-token`"
               :value="token"
+              :disabled="STATIC_PREVIEW"
               autocomplete="off"
               spellcheck="false"
               @input="emit('update:token', $event.target.value)"
             />
           </label>
-          <button :disabled="loadingData || !token" type="button" @click="emit('blade-auth-login')">
+          <button :disabled="STATIC_PREVIEW || loadingData || !token" type="button" @click="emit('blade-auth-login')">
             {{ loadingData ? '加载中' : `${credentialName} 登录` }}
           </button>
-          <button class="button-secondary" type="button" @click="emit('clear-token')">清空</button>
+          <button :disabled="STATIC_PREVIEW" class="button-secondary" type="button" @click="emit('clear-token')">清空</button>
         </div>
       </div>
     </details>
