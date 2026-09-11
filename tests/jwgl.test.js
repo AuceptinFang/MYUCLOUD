@@ -3,9 +3,9 @@ import test from 'node:test'
 import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { Readable } from 'node:stream'
-import { parseTimetable } from '../jwgl-timetable.js'
-import { JwglSessionStore } from '../jwgl-sessions.js'
+import { createBackend } from '../server/app.js'
+import { parseTimetable } from '../server/parsers/timetable.js'
+import { JwglSessionStore } from '../server/storage/jwgl-sessions.js'
 import { currentTimetableWeek, groupTimetableCourses, validateTimetableCache } from '../src/utils/timetable.js'
 
 const html = readFileSync(new URL('./fixtures/timetable.html', import.meta.url), 'utf8')
@@ -57,10 +57,6 @@ test('服务端凭证可在重启后恢复，支持过期和撤销', (t) => {
 })
 
 test('同一登录凭证访问课表和评教，恢复和退出遵循相同接口', { timeout: 10000 }, async (t) => {
-  const previous = process.cwd()
-  const dir = mkdtempSync(join(tmpdir(), 'jwgl-api-test-'))
-  process.chdir(dir)
-  t.after(() => { process.chdir(previous); rmSync(dir, { recursive: true, force: true }) })
   t.mock.method(console, 'log', () => {})
   let expired = false
   const calls = []
@@ -71,15 +67,14 @@ test('同一登录凭证访问课表和评教，恢复和退出遵循相同接�
     if (String(url).endsWith('LoginToXk')) return new Response('ok', { headers: { 'Set-Cookie': 'JSESSIONID=updated; Path=/' } })
     return new Response('ok', { headers: { 'Set-Cookie': 'route=test; Path=/' } })
   })
-  const { jwglPlugin } = await import('../vite.jwgl.js')
-  const routes = new Map()
-  jwglPlugin().configureServer({ middlewares: { use: (path, handler) => routes.set(path, handler) } })
-  const request = (path, body) => new Promise((resolve, reject) => {
-    const req = Readable.from([JSON.stringify(body)])
-    req.method = 'POST'
-    const res = { statusCode: 200, setHeader() {}, end(value) { resolve({ status: this.statusCode, ...JSON.parse(value) }) } }
-    Promise.resolve(routes.get(path)(req, res, () => reject(new Error('unexpected next')))).catch(reject)
-  })
+  const sessions = new Map()
+  const app = createBackend({ getSessionStore: () => sessions })
+  const request = async (path, body) => {
+    const response = await app.request(path, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    })
+    return { status: response.status, ...await response.json() }
+  }
   assert.equal((await request('/api/jwgl/timetable', {})).status, 401)
   const login = await request('/api/jwgl/login', { username: 'student', password: 'test-password' })
   assert.equal(login.status, 200)

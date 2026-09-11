@@ -1196,6 +1196,7 @@ onUnmounted(() => {
         :authenticated="Boolean(userInfo)"
         :loading-data="loadingStudy"
         :loading-login="loggingIn"
+        :login-action="loginUrl"
         :user-label="userLabel"
         @clear-token="clearToken"
         @blade-auth-login="loginWithBladeAuth"

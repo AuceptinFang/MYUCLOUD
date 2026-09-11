@@ -1,3 +1,5 @@
+import { ApiError } from '../http.js'
+
 const SERVICE_URL = 'https://ucloud.bupt.edu.cn'
 const API_BASE_URL = 'https://apiucloud.bupt.edu.cn'
 const TOKEN_URL = `${API_BASE_URL}/ykt-basics/oauth/token`
@@ -71,29 +73,6 @@ function getCookies(headers) {
   return (headers.get('set-cookie') || '').split(';')[0]
 }
 
-function readRequestBody(req) {
-  return new Promise((resolve, reject) => {
-    let raw = ''
-
-    req.on('data', (chunk) => {
-      raw += chunk
-    })
-    req.on('end', () => {
-      if (!raw) {
-        resolve({})
-        return
-      }
-
-      try {
-        resolve(JSON.parse(raw))
-      } catch (error) {
-        reject(error)
-      }
-    })
-    req.on('error', reject)
-  })
-}
-
 function readResponseBody(text) {
   if (!text) return null
 
@@ -132,14 +111,6 @@ function pickCasError(html) {
       ?.replace(/<[^>]+>/g, '')
       .trim() || ''
   )
-}
-
-function sendJson(res, status, body) {
-  const text = JSON.stringify(body, null, 2)
-
-  res.statusCode = status
-  res.setHeader('Content-Type', 'application/json; charset=utf-8')
-  res.end(text)
 }
 
 async function casLogin(username, password) {
@@ -277,97 +248,44 @@ async function getUserInfo(accessToken) {
   return result
 }
 
-async function handleLogin(req, res) {
+export async function loginUcloud({ username = '', password = '' }) {
+  if (typeof username !== 'string' || typeof password !== 'string' || !username || !password) {
+    throw new ApiError(400, 'username and password are required')
+  }
   try {
-    const { username = '', password = '' } = await readRequestBody(req)
-
-    if (!username || !password) {
-      sendJson(res, 400, {
-        success: false,
-        msg: 'username and password are required',
-      })
-      return
-    }
-
-    serverLog('login:start', {
-      username,
-      password: {
-        present: true,
-        length: password.length,
-      },
-    })
-
     const cas = await casLogin(username, password)
     if (!cas.post.ticket) {
-      sendJson(res, 401, {
-        success: false,
-        stage: 'cas-login',
-        msg: cas.post.error || 'CAS login did not return ticket',
-        cas,
+      throw new ApiError(401, {
+        success: false, stage: 'cas-login',
+        msg: cas.post.error || 'CAS login did not return ticket', cas,
       })
-      return
     }
-
     const tokenResponse = await exchangeToken(cas.post.ticket)
     const accessToken = tokenResponse.body?.access_token || ''
-
     if (!tokenResponse.ok || !accessToken) {
-      sendJson(res, tokenResponse.status || 502, {
-        success: false,
-        stage: 'oauth-token',
+      throw new ApiError(tokenResponse.status || 502, {
+        success: false, stage: 'oauth-token',
         msg: tokenResponse.body?.error_description || tokenResponse.body?.msg || 'token exchange failed',
-        cas,
-        tokenResponse,
+        cas, tokenResponse,
       })
-      return
     }
-
     const userInfo = await getUserInfo(accessToken)
-
-    sendJson(res, 200, {
-      success: true,
-      token: accessToken,
-      access_token: accessToken,
+    return {
+      success: true, token: accessToken, access_token: accessToken,
       refresh_token: tokenResponse.body?.refresh_token || '',
-      tokenResponse,
-      userInfo,
-      cas,
+      tokenResponse, userInfo, cas,
       authHeaders: {
-        'Blade-Auth': accessToken,
-        Authorization: BUSINESS_AUTHORIZATION,
-        'Tenant-Id': TENANT_ID,
+        'Blade-Auth': accessToken, Authorization: BUSINESS_AUTHORIZATION, 'Tenant-Id': TENANT_ID,
       },
-    })
+    }
   } catch (error) {
+    if (error instanceof ApiError) throw error
     const detail = describeError(error)
-    serverLog('login:error', {
-      ...detail,
-      stage: error?.stage || 'server',
-      stack: error?.stack,
-    })
-    sendJson(res, 500, {
-      success: false,
-      stage: error?.stage || 'server',
-      msg: detail.hostname
-        ? `无法连接上游服务 ${detail.hostname}`
-        : error?.message || 'login failed',
+    serverLog('login:error', { ...detail, stage: error?.stage || 'server' })
+    throw new ApiError(500, {
+      success: false, stage: error?.stage || 'server',
+      msg: detail.hostname ? `无法连接上游服务 ${detail.hostname}` : error?.message || 'login failed',
       error: detail,
     })
-  }
-}
-
-export function ucloudAuthPlugin() {
-  return {
-    name: 'mock-ucloud-auth',
-    configureServer(server) {
-      server.middlewares.use('/api/login', (req, res, next) => {
-        if (req.method !== 'POST') {
-          next()
-          return
-        }
-
-        handleLogin(req, res)
-      })
-    },
   }
 }

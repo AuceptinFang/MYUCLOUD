@@ -1,18 +1,6 @@
-node_modules
-dist
-dist-ssr
-.git
-.github
-.vscode
-.idea
-*.log
-npm-debug.log*
-coverage
-.eslintcache
-bupt-jwgl
-ucloud
-ucloud-api-platform
-ucloud-bot
-DESIGN_SYSTEM.md
-cookies.txt
-public/fonts/msyh.ttf
+# 调试镜像仅安装依赖；源码由 Compose 挂载。
+**
+!Dockerfile
+!.dockerignore
+!package.json
+!package-lock.json

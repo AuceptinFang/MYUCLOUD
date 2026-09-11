@@ -2,18 +2,13 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import JwglAuthBar from './JwglAuthBar.vue'
 import { jwglLoggedIn, jwglRequest, jwglSessionId, jwglUsername } from '../../api/jwgl.js'
-import { TIMETABLE_KEY, currentTimetableWeek, groupTimetableCourses, validateTimetableCache } from '../../utils/timetable.js'
+import { TIMETABLE_KEY, currentTimetableWeek, groupTimetableCourses, mergeTimetableWeek, readTimetableCache } from '../../utils/timetable.js'
 
 const error = ref('')
 const storageWarning = ref('')
 const cache = ref(null)
 try {
-  const raw = localStorage.getItem(TIMETABLE_KEY)
-  if (raw) {
-    const stored = JSON.parse(raw)
-    if (!validateTimetableCache(stored)) throw new Error('invalid cache')
-    cache.value = stored
-  }
+  cache.value = readTimetableCache(localStorage)
 } catch {
   storageWarning.value = '无法读取本地课表，请重新同步。'
 }
@@ -27,6 +22,7 @@ const weeks = computed(() => cache.value?.weeks || [])
 const current = computed(() => weeks.value.find((week) => week.week === selectedWeek.value))
 const groups = computed(() => Array.from({ length: 7 }, (_, index) => groupTimetableCourses(current.value?.courses || [], index + 1)))
 const savedAt = computed(() => cache.value ? new Date(cache.value.savedAt).toLocaleString('zh-CN', { hour12: false }) : '')
+const missingWeeks = computed(() => (current.value?.weeks || []).filter((week) => !weeks.value.some((saved) => saved.week === week)))
 let controller
 onBeforeUnmount(() => controller?.abort())
 watch(jwglSessionId, () => controller?.abort(), { flush: 'sync' })
@@ -39,32 +35,33 @@ async function syncTimetable() {
   const syncingUsername = jwglUsername.value
   const syncingSession = jwglSessionId.value
   const request = (body) => jwglRequest('/api/jwgl/timetable', body, { signal: controller.signal })
-  try {
-    progress.value = '正在读取课表周次…'
-    const { timetable: first } = await request(mode.value ? { mode: mode.value } : {})
-    const loaded = [first]
-    for (const week of first.weeks) {
-      if (week === first.week) continue
-      progress.value = `正在同步第 ${week} 周（${loaded.length}/${first.weeks.length}）…`
-      const { timetable } = await request({ week, mode: first.mode })
-      loaded.push(timetable)
-    }
-    const updated = {
-      version: 1, username: syncingUsername, mode: first.mode,
-      savedAt: new Date().toISOString(), weeks: loaded.sort((a, b) => a.week - b.week),
-    }
-    if (!validateTimetableCache(updated)) throw new Error('课表数据不完整，请重试')
-    if (syncingSession !== jwglSessionId.value) return
-    // 全部周次成功后再替换缓存，刷新失败时仍可查看旧课表。
+  function saveWeek(timetable) {
+    if (syncingSession !== jwglSessionId.value || controller.signal.aborted) throw new DOMException('同步已取消', 'AbortError')
+    const updated = mergeTimetableWeek(cache.value, syncingUsername, timetable)
+    const keepSelection = cache.value?.username === syncingUsername
+      && updated.weeks.some((week) => week.week === selectedWeek.value)
     storageWarning.value = ''
     try { localStorage.setItem(TIMETABLE_KEY, JSON.stringify(updated)) } catch {
       storageWarning.value = '课表已加载，但浏览器未能保存本地数据；关闭页面后需要重新同步。'
     }
     cache.value = updated
-    selectedWeek.value = currentTimetableWeek(updated.weeks) ?? first.week
-    mode.value = first.mode
+    if (!keepSelection) selectedWeek.value = currentTimetableWeek(updated.weeks) ?? timetable.week
+    mode.value = timetable.mode
+  }
+  try {
+    progress.value = '正在读取课表周次…'
+    const { timetable: first } = await request(mode.value ? { mode: mode.value } : {})
+    saveWeek(first)
+    let loadedCount = 1
+    for (const week of first.weeks) {
+      if (week === first.week) continue
+      progress.value = `正在同步第 ${week} 周（${loadedCount}/${first.weeks.length}）…`
+      const { timetable } = await request({ week, mode: first.mode })
+      saveWeek(timetable)
+      loadedCount += 1
+    }
   } catch (cause) {
-    if (cause.name !== 'AbortError') error.value = `${cause.message}${cache.value ? '，已保留原有本地课表。' : ''}`
+    if (cause.name !== 'AbortError') error.value = `${cause.message}${cache.value ? '，可继续查看已保存的课表。' : ''}`
   } finally {
     busy.value = false
     progress.value = ''
@@ -117,6 +114,7 @@ function isCovered(day, period) {
           <button v-if="currentTimetableWeek(weeks) !== undefined" class="button-secondary" type="button" @click="selectedWeek = currentTimetableWeek(weeks)">本周</button>
         </div>
         <p>{{ cache.username }} · 本地课表 · 同步于 {{ savedAt }}</p>
+        <p v-if="missingWeeks.length && !busy">已保存 {{ weeks.length }} 周课表，尚有 {{ missingWeeks.length }} 周未同步。</p>
       </div>
       <p v-if="!current.courses.length" class="notice">第 {{ selectedWeek }} 周暂无课程。</p>
 

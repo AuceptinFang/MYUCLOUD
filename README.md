@@ -12,7 +12,9 @@
 
 顶部“课表”或 `#timetable` 可直接打开课表页，无需先登录 UCloud。课表和评教共用教务登录状态，使用同一个登录组件，支持账号密码或已有教务凭证登录；教务凭证与 UCloud 的 Blade-Auth 各自独立。
 
-首次登录后同步本学期所有周次，之后从当前浏览器的 `localStorage` 读取课表，切换周次不请求教务系统。教务登录状态和账号显示在页面上方；重新同步、节次模式位于页面底部默认收起的“课表设置”中。失败或取消同步时保留旧课表，节次模式在重新同步后应用。
+首次登录后同步本学期所有周次，每成功获取一周立即写入当前浏览器的 `localStorage`。即使首次同步中途断网或登录过期，也可以继续查看已保存的周次。再次进入课表页直接读取本地数据，查看和切换已保存的周次不请求教务系统，也不要求登录成功。教务登录状态和账号显示在页面上方；重新同步、节次模式位于页面底部默认收起的“课表设置”中。
+
+重新同步按周更新，同一账号、学期和节次模式下，尚未重新获取的周次继续保留旧数据；登录失败、网络错误或取消不会清空已有缓存。部分周次尚未同步时会标注数量。节次模式在重新同步后应用。
 
 教务凭证保存在 `mock-ucloud-jwgl-auth`，课表保存在 `mock-ucloud-timetable-v1`。退出或凭证过期会清除登录状态，保留本地课表。新登录保存凭证，不再保存教务密码，并删除旧版 `jwgl_creds`。刷新页面和切换课表/评教时复用已有凭证。
 
@@ -31,7 +33,7 @@
 
 ## 本地运行
 
-本项目暂时无法静态部署，需要一个服务端，暂时只支持源码构建，方法如下
+前端使用 Vue/Vite，后端使用 Hono。开发时由 Vite 接入同一套 Hono 路由：
 
 ```sh
 npm ci
@@ -44,7 +46,40 @@ npm run dev
 http://127.0.0.1:5173/
 ```
 
-注意：`/api/login` 和 `/ucloud` 代理都依赖 Vite dev server。直接打开 `dist/index.html` 或只用静态托管都不能完成账号密码登录流程。
+`npm run dev` 和 `npm run preview` 均通过 `vite.backend.js` 接入 Hono。预览构建结果时运行：
+
+```sh
+npm run build
+npm run preview
+```
+
+后端也可以独立启动，默认监听 `127.0.0.1:8787`：
+
+```sh
+npm run server
+# 可通过 HOST、PORT 设置监听地址
+```
+
+独立后端只提供 API 和代理，不托管前端。分开部署时，应将 `/api/*`、`/ucloud/*`、`/file/*`、`/jwgl/*`、`/office/*` 转发到后端，其余请求交给静态站点。直接打开 `dist/index.html` 或只有静态托管无法完成学校登录和接口代理。
+
+## 后端组织
+
+- `server/app.js`：Hono 应用工厂、统一错误处理与路由注册。
+- `server/routes/`：教务 JSON/SSE 路由，以及 UCloud、文件、教务、Office 代理。
+- `server/services/`：CAS/OAuth、教务登录、课表获取和评教业务流程。
+- `server/parsers/timetable.js`：课表 HTML 解析。
+- `server/storage/jwgl-sessions.js`：当前教务会话文件存储。
+- `server/node-app.js`：为应用注入 Node 会话存储，延迟到实际请求时打开文件。
+- `server/entries/node.js`：独立 Node HTTP 服务入口。
+- `vite.backend.js`：使用 Hono 官方 Node 适配器接入 Vite 开发与预览服务。
+
+路由和业务模块使用 Web Request/Response、fetch 和 Streams，Node 文件系统依赖集中在会话存储及启动适配中。项目提供本地构建与 Node 运行方式，教务登录使用 `sessionId` 协议。
+
+```sh
+npm test
+```
+
+测试使用模拟学校响应，覆盖登录、Cookie、课表缓存、HTTP 适配、视频 Range、上传代理和 SSE；不会提交真实作业或评教。
 
 ## Docker（调试模式）
 
@@ -92,7 +127,7 @@ Tenant-Id: 000000
 
 ## 本项目封装接口
 
-本项目的 Vite dev server 提供了一个本地封装接口，其他前端页面可以直接调用它，不需要自己处理 CAS cookie、隐藏字段和 ticket。
+本项目的 Hono 后端提供了一个登录封装接口，其他前端页面可以直接调用它，不需要自己处理 CAS cookie、隐藏字段和 ticket。
 
 ```http
 POST /api/login
@@ -246,7 +281,7 @@ Authorization: Basic c3dvcmQ6c3dvcmRfc2VjcmV0
 Tenant-Id: 000000
 ```
 
-本项目里可以通过 Vite 代理请求：
+本项目里可以通过 Hono 代理请求：
 
 ```text
 /ucloud/ykt-basics/info
@@ -260,7 +295,7 @@ https://apiucloud.bupt.edu.cn/ykt-basics/info
 
 ### 已确认业务接口
 
-本地开发时把远程 host 换成 `/ucloud`，由 Vite 代理到 `https://apiucloud.bupt.edu.cn`。
+本地开发时把远程 host 换成 `/ucloud`，由 Hono 后端代理到 `https://apiucloud.bupt.edu.cn`。
 
 #### 用户信息
 
@@ -422,30 +457,9 @@ GET https://fileucloud.bupt.edu.cn/ucloud/document/<storageId>.<ext>
 - **CORS 白名单**：只允许 `Origin: https://ucloud.bupt.edu.cn`，本地 `localhost` 直接请求会被浏览器拦截
 - **防盗链检查**：校验 `Origin` / `Referer`，同时拒绝携带 `Authorization` / `Blade-Auth` 等业务鉴权头（收到非 AWS4 签名会报 `InvalidRequest`）
 
-因此本地开发需要通过 Vite 代理转发：
+文件请求通过 `server/routes/proxy.js` 中的 `/file` 路由转发。后端移除 `/file` 前缀，将来源头设为学校站点，并剥离 `Authorization`、`Blade-Auth` 和 `Tenant-Id`。
 
-```javascript
-// vite.config.js
-'/file': {
-  target: 'https://fileucloud.bupt.edu.cn',
-  changeOrigin: true,                        // 改写 Host 头
-  rewrite: (path) => path.replace(/^\/file/, ''),  // /file/xxx → /xxx
-  headers: {
-    'Origin': 'https://ucloud.bupt.edu.cn',  // 伪装来源，绕过 CORS
-    'Referer': 'https://ucloud.bupt.edu.cn/',
-  },
-  configure: (proxy) => {
-    proxy.on('proxyReq', (proxyReq) => {
-      proxyReq.removeHeader('Authorization'); // 剥离业务鉴权头
-    });
-  }
-},
-```
-
-**关键点**：
-
-- 请求走 Vite 代理后对浏览器是同源（`localhost:5173/file/...`），不存在 CORS 问题
-- 在服务端设置 `Origin` / `Referer` 伪装成学校官网页面发起的请求，绕过防盗链
+请求和响应体以流的形式转发，保留 `Range`、`Content-Range`、`206` 状态和原始查询参数。开发、预览和独立后端使用同一套代理逻辑。
 
 #### 作业提交
 

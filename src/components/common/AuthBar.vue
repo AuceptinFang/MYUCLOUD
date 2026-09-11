@@ -3,6 +3,9 @@ defineProps({
   serviceName: { type: String, default: 'UCloud' },
   credentialName: { type: String, default: 'Blade-Auth' },
   loginHint: { type: String, default: '使用统一认证或 Blade-Auth' },
+  credentialScope: { type: String, default: 'ucloud' },
+  loginAction: { type: String, default: '/api/login' },
+  passwordLabel: { type: String, default: '统一认证密码' },
   username: {
     type: String,
     default: '',
@@ -70,20 +73,31 @@ const emit = defineEmits([
       </summary>
 
       <div class="auth-methods">
-        <form class="auth-form" @submit.prevent="emit('login')">
+        <form
+          :id="`${credentialScope}-login-form`"
+          :name="`${credentialScope}-login`"
+          :action="loginAction"
+          method="post"
+          class="auth-form"
+          @submit.prevent="emit('login')"
+        >
           <label>
             学号
             <input
+              :id="`${credentialScope}-username`"
+              :name="`${credentialScope}-username`"
               :value="username"
-              autocomplete="username"
+              :autocomplete="`section-${credentialScope} username`"
               @input="emit('update:username', $event.target.value)"
             />
           </label>
           <label>
-            密码
+            {{ passwordLabel }}
             <input
+              :id="`${credentialScope}-password`"
+              :name="`${credentialScope}-password`"
               :value="password"
-              autocomplete="current-password"
+              :autocomplete="`section-${credentialScope} current-password`"
               type="password"
               @input="emit('update:password', $event.target.value)"
             />
@@ -97,6 +111,8 @@ const emit = defineEmits([
           <label>
             {{ credentialName }}
             <input
+              :id="`${credentialScope}-token`"
+              :name="`${credentialScope}-token`"
               :value="token"
               autocomplete="off"
               spellcheck="false"

@@ -228,7 +228,14 @@ function formatTime(value) {
       </summary>
 
       <div class="debug-auth-grid">
-        <form class="debug-auth-section" @submit.prevent="emit('login')">
+        <form
+          id="ucloud-debug-login-form"
+          name="ucloud-login"
+          :action="loginUrl"
+          method="post"
+          class="debug-auth-section"
+          @submit.prevent="emit('login')"
+        >
           <div>
             <h3>账号登录</h3>
             <p>通过本地 CAS 封装接口获取 Blade-Auth。</p>
@@ -241,16 +248,20 @@ function formatTime(value) {
             <label>
               学号
               <input
+                id="ucloud-debug-username"
+                name="ucloud-username"
                 :value="username"
-                autocomplete="username"
+                autocomplete="section-ucloud username"
                 @input="emit('update:username', $event.target.value)"
               />
             </label>
             <label>
-              密码
+              统一认证密码
               <input
+                id="ucloud-debug-password"
+                name="ucloud-password"
                 :value="password"
-                autocomplete="current-password"
+                autocomplete="section-ucloud current-password"
                 type="password"
                 @input="emit('update:password', $event.target.value)"
               />
