@@ -9,7 +9,7 @@ import { normalizeBackendOrigin } from './src/utils/backend-url.js'
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_')
-  const backendOrigin = normalizeBackendOrigin(env.VITE_BACKEND_URL ?? (mode === 'pages' ? 'https://u.pub.aucept.in' : ''))
+  const backendOrigin = normalizeBackendOrigin(env.VITE_BACKEND_URL ?? (mode === 'pages' ? 'https://u.aucept.in' : ''))
   return {
     define: { 'import.meta.env.VITE_BACKEND_URL': JSON.stringify(backendOrigin) },
     base: mode === 'pages' ? './' : '/',
