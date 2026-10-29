@@ -35,53 +35,40 @@ function getTeacherNames(course) {
 </script>
 
 <template>
-  <section class="section-block">
+  <section class="section-block course-section">
     <div class="section-header">
-      <div>
-        <h2>课程</h2>
-      </div>
-      <span class="section-count">{{ courses.length }}</span>
+      <h2>我的课程</h2>
+      <span v-if="courses.length" class="record-count">{{ courses.length }} 门课程</span>
     </div>
-
-    <div v-if="loading" class="course-skeleton-grid" aria-label="正在读取课程">
-      <div v-for="index in 3" :key="index" class="skeleton-course-card">
-        <i class="skeleton-line skeleton-line-title" />
-        <i class="skeleton-line skeleton-line-short" />
-        <i class="skeleton-chip" />
-      </div>
+    <div v-if="loading" class="list-placeholder" role="status">正在读取课程…</div>
+    <div v-else-if="!courses.length" class="list-placeholder">
+      <strong>课程尚未加载</strong>
+      <p>登录后，这里会列出你本学期的课程。</p>
     </div>
-
-    <div v-else-if="courses.length === 0" class="empty-state empty-state-card">
-      <span class="empty-cloud" aria-hidden="true"><i /><i /></span>
-      <strong>暂无课程</strong>
-      <p>登录并加载数据后，课程会显示在这里</p>
-    </div>
-
-    <div v-else class="course-grid">
-      <button
-        v-for="(course, index) in courses"
-        :key="getCourseId(course)"
-        :aria-pressed="getCourseId(course) === selectedCourseId"
-        class="course-card"
-        :class="{
-          active: getCourseId(course) === selectedCourseId,
-          loading: getCourseId(course) === loadingCourseId,
-        }"
-        type="button"
-        @click="emit('select', course)"
-      >
-        <div class="course-content">
-          <div class="course-heading">
+    <ul v-else class="course-register">
+      <li v-for="(course, index) in courses" :key="getCourseId(course)">
+        <button
+          class="register-course"
+          :class="{ selected: getCourseId(course) === selectedCourseId }"
+          type="button"
+          :disabled="getCourseId(course) === loadingCourseId"
+          @click="emit('select', course)"
+        >
+          <span class="course-index" aria-hidden="true">
+            {{ String(index + 1).padStart(2, '0') }}
+          </span>
+          <span class="register-copy">
             <strong>{{ course.siteName || '未命名课程' }}</strong>
-            <span aria-hidden="true">{{ String(index + 1).padStart(2, '0') }}</span>
-          </div>
-          <p class="course-teacher">{{ getTeacherNames(course) }}</p>
-          <div class="course-meta">
-            <span class="course-term">{{ course.termName || '无学期' }}</span>
-            <span class="course-department">{{ course.departmentName || course.department || '无院系' }}</span>
-          </div>
-        </div>
-      </button>
-    </div>
+            <small>
+              {{ getTeacherNames(course) }}
+              <span v-if="course.termName">· {{ course.termName }}</span>
+            </small>
+          </span>
+          <span class="register-arrow" aria-hidden="true">
+            {{ getCourseId(course) === loadingCourseId ? '…' : '›' }}
+          </span>
+        </button>
+      </li>
+    </ul>
   </section>
 </template>

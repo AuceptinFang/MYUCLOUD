@@ -1,0 +1,15 @@
+:root {
+  --font-ui: system-ui, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --bg: #f5f1f2; --surface: #fffdfd; --surface-muted: #f0e9ed;
+  --text-1: #302b32; --text-2: #665a65; --border: #ded3da;
+  --primary: #765e72; --primary-foreground: #fff; --success: #337557;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px;
+  --section-gap: 24px; --card-padding: 18px; --panel-padding: 20px;
+  --radius-control: 8px; --radius-card: 14px;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #231f25; --surface: #302a32; --surface-muted: #3c333e;
+  --text-1: #f5eff4; --text-2: #cbbeca; --border: #5b4c59;
+  --primary: #d6b4cd; --primary-foreground: #302330; --success: #8cc7a7;
+}

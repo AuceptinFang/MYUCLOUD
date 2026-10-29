@@ -49,7 +49,8 @@ test('服务端凭证可在重启后恢复，支持过期和撤销', (t) => {
   const store = new JwglSessionStore(file)
   store.set('token', { username: 'student', cookies: 'route=test; JSESSIONID=test', expiresAt: Date.now() + 60000 })
   assert.equal(new JwglSessionStore(file).get('token').username, 'student')
-  assert.equal(statSync(file).mode & 0o777, 0o600)
+  // Windows uses ACLs and does not implement POSIX permission bits.
+  if (process.platform !== 'win32') assert.equal(statSync(file).mode & 0o777, 0o600)
   store.set('expired', { username: 'student', cookies: '', expiresAt: 1 })
   assert.equal(store.get('expired'), undefined)
   store.delete('token')

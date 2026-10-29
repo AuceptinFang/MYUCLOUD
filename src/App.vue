@@ -1291,6 +1291,8 @@ onUnmounted(() => {
 
 <template>
   <AppShell
+    :user-label="userLabel"
+    :authenticated="Boolean(userInfo)"
     :active-view="activeView"
     :debug-enabled="debugEnabled"
     :plugins="plugins"
@@ -1316,9 +1318,8 @@ onUnmounted(() => {
         {{ studyError }}
       </section>
 
-      <section class="study-overview" aria-label="学习概览">
+      <section v-if="userInfo" class="study-overview" aria-label="学习概览">
         <div class="overview-heading">
-          <span>OVERVIEW</span>
           <strong>学习概览</strong>
         </div>
         <div class="metrics-grid">
@@ -1330,34 +1331,36 @@ onUnmounted(() => {
             <span>待完成</span>
             <strong>{{ pendingAssignments.length }}</strong>
           </div>
-          <div class="metric-card metric-urgent">
+          <div class="metric-card metric-urgent" :class="{ 'has-value': urgentAssignments.length }">
             <span>临近截止</span>
             <strong>{{ urgentAssignments.length }}</strong>
           </div>
-          <div class="metric-card metric-overdue">
+          <div class="metric-card metric-overdue" :class="{ 'has-value': overdueAssignments.length }">
             <span>截止未交</span>
             <strong>{{ overdueAssignments.length }}</strong>
           </div>
         </div>
       </section>
 
-      <CourseGrid
-        :courses="courses"
-        :loading="loadingStudy"
-        :loading-course-id="loadingCourseId"
-        :selected-course-id="selectedCourseId"
-        @select="openCourse"
-      />
-      <DeadlineList
-        v-model:include-completed="includeCompleted"
-        v-model:page-size="assignmentPageSize"
-        :assignments="visibleAssignments"
-        :last-loaded-at="lastLoadedAt"
-        :loading="loadingStudy"
-        :loading-assignment-id="loadingAssignmentId"
-        :selected-assignment-id="selectedAssignmentId"
-        @select="openAssignment"
-      />
+      <div class="study-columns">
+        <CourseGrid
+          :courses="courses"
+          :loading="loadingStudy"
+          :loading-course-id="loadingCourseId"
+          :selected-course-id="selectedCourseId"
+          @select="openCourse"
+        />
+        <DeadlineList
+          v-model:include-completed="includeCompleted"
+          v-model:page-size="assignmentPageSize"
+          :assignments="visibleAssignments"
+          :last-loaded-at="lastLoadedAt"
+          :loading="loadingStudy"
+          :loading-assignment-id="loadingAssignmentId"
+          :selected-assignment-id="selectedAssignmentId"
+          @select="openAssignment"
+        />
+      </div>
     </template>
 
     <template v-else-if="activeView === 'course'">
