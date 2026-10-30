@@ -45,8 +45,10 @@ export function mergeTimetableWeek(cache, username, timetable) {
   return updated
 }
 
+// 课表日期是北京时间，“今天”也按北京时间算，设备在其他时区时不会错到上一周或下一周
 export function currentTimetableWeek(weeks, now = new Date()) {
-  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())
+  const beijing = new Date(now.getTime() + 8 * 60 * 60 * 1000)
+  const today = Date.UTC(beijing.getUTCFullYear(), beijing.getUTCMonth(), beijing.getUTCDate())
   return weeks.find((week) => {
     const date = new Date(`${week.date}T00:00:00Z`)
     const monday = date.getTime() - ((date.getUTCDay() + 6) % 7) * 86400000

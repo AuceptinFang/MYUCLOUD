@@ -827,3 +827,7 @@ a.feed-assignment {
   color: var(--ink);
   font-size: 13px;
 }
+.survey-draft-hint {
+  color: var(--muted);
+  font-size: 12px;
+}

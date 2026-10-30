@@ -35,7 +35,14 @@ import DeadlineList from './components/common/DeadlineList.vue'
 import SurveyPanel from './components/common/SurveyPanel.vue'
 import AppShell from './components/layout/AppShell.vue'
 import { usePlugins } from './plugin/index.js'
-import { isSubmitViewSubmitted, normalizeAssignment, normalizeQuiz, normalizeSurvey, sortAssignments } from './utils/deadline'
+import {
+  formatBeijingTime,
+  isSubmitViewSubmitted,
+  normalizeAssignment,
+  normalizeQuiz,
+  normalizeSurvey,
+  sortAssignments,
+} from './utils/deadline'
 import FeedbackDialog from './components/common/FeedbackDialog.vue'
 import { buildFeedbackReport, collectKnownSecrets } from './utils/feedback-report.js'
 import { jwglSessionId } from './api/jwgl.js'
@@ -389,15 +396,6 @@ function mergeAssignmentResources(resources) {
   })
 }
 
-function formatBackendTime(date = new Date()) {
-  const pad = (value) => String(value).padStart(2, '0')
-
-  return [
-    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`,
-    `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`,
-  ].join(' ')
-}
-
 function pickSubmitTime(body) {
   const data = body?.data ?? body
   if (!data || typeof data !== 'object') return ''
@@ -504,7 +502,7 @@ async function refreshAssignmentsAfterSubmit(assignmentId) {
 
         // 只有 submit-view 已确认提交时才补齐列表状态，学校未确认时以学校列表为准
         return confirmedLocally && !normalized.isCompleted
-          ? patchSubmittedAssignment(normalized, assignmentSubmitResult.value.submitTime || formatBackendTime())
+          ? patchSubmittedAssignment(normalized, assignmentSubmitResult.value.submitTime || formatBeijingTime())
           : normalized
       }),
     )
@@ -723,7 +721,7 @@ async function loadStudyData() {
   }
 }
 
-// 问卷和测验只做提醒，读不到时不影响作业列表
+// 问卷和测验各自单独请求，读不到时不影响作业列表
 async function loadActivityTasks(userId, courseRecords) {
   const courseNames = new Map(courseRecords.map((course) => [getCourseId(course), getCourseName(course)]))
 
@@ -1293,7 +1291,7 @@ async function submitSelectedAssignment({ assignment, content, files = [] }) {
         submitTime,
         attachmentCount: extractSubmitViewAttachmentIds(confirmation.body).length,
       }
-      markAssignmentSubmitted(assignmentId, submitTime || formatBackendTime())
+      markAssignmentSubmitted(assignmentId, submitTime || formatBeijingTime())
       await loadSubmitAttachmentResources(extractSubmitViewAttachmentIds(confirmation.body), assignmentDetailRequestId)
     } else {
       assignmentSubmitResult.value = { confirmed: false }
@@ -1333,6 +1331,7 @@ function clearToken() {
   assignments.value = []
   activityTasks.value = []
   selectedSurvey.value = null
+  surveyTitle.value = ''
   resetCourseResources()
   resetCourseAssignments()
   resetAssignmentDetail()
@@ -1582,6 +1581,7 @@ onUnmounted(() => {
         :survey-id="routeSurveyId"
         :token="bladeToken"
         :user-id="String(userInfo?.id || '')"
+        :already-submitted="Boolean(selectedSurvey?.isCompleted)"
         @expired="handleTokenExpiry('survey')"
         @loaded="surveyTitle = $event.theme || ''"
         @submitted="handleSurveySubmitted"

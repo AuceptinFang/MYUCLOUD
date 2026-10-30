@@ -1,8 +1,37 @@
-export function getDaysLeft(deadline) {
-  if (!deadline) return null
+// 学校接口的时间都是不带时区的北京时间（如 2026-11-15 00:00:00）。按设备时区解析的话，
+// 设备不在东八区时截止判断会整体偏移，所以统一按 +08:00 解析；带时区的字符串照常解析。
+const BEIJING_OFFSET_HOURS = 8
+const LOCAL_TIME_PATTERN = /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/
 
-  const endTime = new Date(deadline).getTime()
-  if (Number.isNaN(endTime)) return null
+export function parseBeijingTime(value) {
+  if (value === null || value === undefined || value === '') return null
+
+  const text = String(value).trim()
+  const match = text.match(LOCAL_TIME_PATTERN)
+  const time = match
+    ? Date.UTC(
+        Number(match[1]),
+        Number(match[2]) - 1,
+        Number(match[3]),
+        Number(match[4] || 0) - BEIJING_OFFSET_HOURS,
+        Number(match[5] || 0),
+        Number(match[6] || 0),
+      )
+    : Date.parse(text)
+
+  return Number.isNaN(time) ? null : time
+}
+
+// 把时刻格式化成学校接口同样的北京时间字符串，例如本地补一个提交时间
+export function formatBeijingTime(date = new Date()) {
+  const beijing = new Date(date.getTime() + BEIJING_OFFSET_HOURS * 60 * 60 * 1000)
+
+  return beijing.toISOString().slice(0, 19).replace('T', ' ')
+}
+
+export function getDaysLeft(deadline) {
+  const endTime = parseBeijingTime(deadline)
+  if (endTime === null) return null
 
   return Math.floor((endTime - Date.now()) / (1000 * 60 * 60 * 24))
 }
@@ -166,7 +195,7 @@ export function normalizeAssignment(record) {
   }
 }
 
-// 问卷（type 2）和测验（type 4）只在待办里提醒，作答要去官方页面。
+// 问卷（type 2）和测验（type 4）和作业一起列入待办；问卷在应用内作答，测验跳转官方页面。
 // 列表只拉未提交的，所以都算未完成；id 加前缀，避免和作业撞号。
 const ACTIVITY_LABELS = { survey: '问卷', quiz: '测验' }
 
@@ -230,27 +259,21 @@ export function normalizeQuiz(record, { courseId = '', courseName = '' } = {}) {
   })
 }
 
-function toTimestamp(value) {
-  if (!value) return null
-  const time = new Date(value).getTime()
-  return Number.isNaN(time) ? null : time
-}
-
 export function sortAssignments(records) {
   return records.sort((left, right) => {
     const priorityDiff = getAssignmentPriority(left) - getAssignmentPriority(right)
     if (priorityDiff !== 0) return priorityDiff
 
-    const leftDeadline = toTimestamp(left.deadline) ?? Number.MAX_SAFE_INTEGER
-    const rightDeadline = toTimestamp(right.deadline) ?? Number.MAX_SAFE_INTEGER
+    const leftDeadline = parseBeijingTime(left.deadline) ?? Number.MAX_SAFE_INTEGER
+    const rightDeadline = parseBeijingTime(right.deadline) ?? Number.MAX_SAFE_INTEGER
 
     // 已截止未交的作业倒序排列：刚过截止的排最前，越久越靠后
     if (left.isOverdue && right.isOverdue) return rightDeadline - leftDeadline
 
     // 已完成的作业倒序排列：最近提交（缺失时回退到最近截止）的排最前
     if (left.isCompleted && right.isCompleted) {
-      const leftTime = toTimestamp(left.submitTime) ?? toTimestamp(left.deadline) ?? 0
-      const rightTime = toTimestamp(right.submitTime) ?? toTimestamp(right.deadline) ?? 0
+      const leftTime = parseBeijingTime(left.submitTime) ?? parseBeijingTime(left.deadline) ?? 0
+      const rightTime = parseBeijingTime(right.submitTime) ?? parseBeijingTime(right.deadline) ?? 0
       return rightTime - leftTime
     }
 

@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue'
 import VideoPreview from './VideoPreview.vue'
 import { fetchBackend, friendlyError, responseErrorMessage } from '../../api/http.js'
 import { assertUcloudOk } from '../../api/ucloud.js'
-import { allowsLateSubmission } from '../../utils/deadline.js'
+import { allowsLateSubmission, parseBeijingTime } from '../../utils/deadline.js'
 import { BUSINESS_AUTH, TENANT_ID, TOKEN_KEY, buildPreviewUrl, buildFileUrl, isVideoResource, getResourcePreviewUrl, pickPreviewData } from '../../api/ucloud'
 
 const props = defineProps({
@@ -425,8 +425,8 @@ function clearPickedFiles() {
 
 // 截止后能否提交只看学校的 isOvertimeCommit；submit-view 与详情都会带，未知时不拦，只提示
 const isPastDeadline = computed(() => {
-  const deadline = new Date(getAssignmentDeadline(props.assignment, props.detail)).getTime()
-  return Number.isFinite(deadline) && deadline < Date.now()
+  const deadline = parseBeijingTime(getAssignmentDeadline(props.assignment, props.detail))
+  return deadline !== null && deadline < Date.now()
 })
 const lateSubmissionAllowed = computed(() => allowsLateSubmission(props.submitView) ?? allowsLateSubmission(props.detail))
 const submissionClosed = computed(() => isPastDeadline.value && lateSubmissionAllowed.value === false)

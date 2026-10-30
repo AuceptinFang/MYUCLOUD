@@ -1,14 +1,21 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { allowsLateSubmission, isRecordCompleted, normalizeAssignment, normalizeQuiz, normalizeSurvey, sortAssignments } from '../src/utils/deadline.js'
+import {
+  allowsLateSubmission,
+  formatBeijingTime,
+  getDaysLeft,
+  isRecordCompleted,
+  normalizeAssignment,
+  normalizeQuiz,
+  normalizeSurvey,
+  parseBeijingTime,
+  sortAssignments,
+} from '../src/utils/deadline.js'
 
 // 字段组合取自真实账号的作业列表：status 2 进行中 / 3 已截止，assignmentStatus 99 未提交 / 0 已提交 / 1 已批改，
-// isOverTime 1 表示截止后补交。
-const daysFromNow = (days) => {
-  const date = new Date(Date.now() + days * 86400000)
-  const pad = (value) => String(value).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
-}
+// isOverTime 1 表示截止后补交。时间是不带时区的北京时间。
+const daysFromNow = (days) =>
+  new Date(Date.now() + days * 86400000 + 8 * 3600000).toISOString().slice(0, 16).replace('T', ' ')
 const record = (fields) => ({
   id: fields.id ?? '1',
   assignmentTitle: fields.title ?? '作业',
@@ -94,4 +101,20 @@ test('问卷和测验的时间去掉秒，和作业列表一致', () => {
   const survey = normalizeSurvey({ id: '1', siteId: -1, theme: '问卷', startTime: '2026-10-29 00:00:00', endTime: '2099-11-15 00:00:00' })
   assert.equal(survey.beginTime, '2026-10-29 00:00')
   assert.equal(survey.deadline, '2099-11-15 00:00')
+})
+
+test('学校的时间按北京时间解析，和设备时区无关', () => {
+  assert.equal(parseBeijingTime('2026-11-15 00:00:00'), Date.parse('2026-11-15T00:00:00+08:00'))
+  assert.equal(parseBeijingTime('2026-11-15 00:00'), Date.parse('2026-11-15T00:00:00+08:00'))
+  assert.equal(parseBeijingTime('2026-11-15'), Date.parse('2026-11-15T00:00:00+08:00'))
+  assert.equal(parseBeijingTime('2026-11-15T08:00:00Z'), Date.parse('2026-11-15T08:00:00Z'))
+  assert.equal(parseBeijingTime(''), null)
+  assert.equal(parseBeijingTime('未设置'), null)
+
+  assert.equal(formatBeijingTime(new Date('2026-10-30T16:05:09Z')), '2026-10-31 00:05:09')
+
+  // 北京时间一小时后截止：任何时区下都还没过期
+  const inOneHour = formatBeijingTime(new Date(Date.now() + 3600000))
+  assert.equal(getDaysLeft(inOneHour), 0)
+  assert.equal(normalizeSurvey({ id: '1', siteId: -1, theme: '问卷', endTime: inOneHour }).isOverdue, false)
 })

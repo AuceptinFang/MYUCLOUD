@@ -6,7 +6,8 @@ import {
 } from '../src/utils/feedback-report.js'
 
 const day = 86400000
-const at = (days) => new Date(Date.now() + days * day).toISOString().slice(0, 16).replace('T', ' ')
+// 学校接口的时间是北京时间
+const at = (days) => new Date(Date.now() + days * day + 8 * 3600000).toISOString().slice(0, 16).replace('T', ' ')
 const token = 'eyJhbGciOiJIUzUxMiJ9.eyJ1c2VyX2lkIjoiMjAyNDIxMTM1NSJ9.c2lnbmF0dXJlLXNpZ25hdHVyZS1zaWduYXR1cmU'
 const userInfo = { id: '1858293410123456789', account: '2024211355', realName: '张三', phone: '13812345678', tenantId: '000000' }
 

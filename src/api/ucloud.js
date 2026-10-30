@@ -263,7 +263,7 @@ export async function getUnsubmittedQuizzes(token, siteId) {
 
 const UCLASS_URL = 'https://ucloud.bupt.edu.cn/uclass'
 
-// 问卷和测验要在官方页面作答，跳转地址和官方首页待办的一致
+// 官方作答页地址，和官方首页待办的跳转一致：测验在这里作答，问卷只在遇到不支持的题型时使用
 export function buildActivityUrl(item) {
   const id = encodeURIComponent(item?.activityId || '')
   if (!id) return ''

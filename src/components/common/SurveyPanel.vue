@@ -9,6 +9,10 @@ import {
   isSupportedSurveyQuestion,
   isSurveyAnswered,
   normalizeSurveyQuestions,
+  readSurveyDraft,
+  removeSurveyDraft,
+  restoreSurveyAnswers,
+  writeSurveyDraft,
 } from '../../utils/survey.js'
 import { trimSeconds } from '../../utils/deadline.js'
 
@@ -25,6 +29,11 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  // 本次会话里已经提交过（例如提交后用浏览器后退回到这里），不再显示表单
+  alreadySubmitted: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 const emit = defineEmits(['loaded', 'submitted', 'expired'])
@@ -39,15 +48,19 @@ const confirming = ref(false)
 const submitting = ref(false)
 const submitError = ref('')
 const submitted = ref(false)
+const restoredDraft = ref(false)
 let loadRequestId = 0
+// 草稿恢复之后才开始写回，避免读取问卷时的空答案把草稿覆盖掉
+let draftReady = false
 
 const answeredCount = computed(
   () => questions.value.filter((question) => isSurveyAnswered(question, answers.value[question.id])).length,
 )
 const hasUnsupportedQuestion = computed(() => questions.value.some((question) => !isSupportedSurveyQuestion(question)))
+const isSubmitted = computed(() => submitted.value || props.alreadySubmitted)
 const officialUrl = computed(() => buildActivityUrl({ kind: 'survey', activityId: props.surveyId }))
 const subtitle = computed(() => {
-  if (!detail.value) return '正在读取问卷'
+  if (!detail.value) return error.value ? '读取失败' : '正在读取问卷'
 
   return [
     `共 ${questions.value.length} 题`,
@@ -76,7 +89,16 @@ async function loadSurvey() {
   confirming.value = false
   submitError.value = ''
   submitted.value = false
-  if (!props.surveyId || !props.token) return
+  restoredDraft.value = false
+  draftReady = false
+  if (!props.surveyId) {
+    error.value = '链接里没有问卷编号'
+    return
+  }
+  if (!props.token) {
+    error.value = '请先回到首页登录'
+    return
+  }
 
   loading.value = true
   try {
@@ -93,11 +115,24 @@ async function loadSurvey() {
     questions.value = normalizeSurveyQuestions(data.questionPage?.records)
     answers.value = Object.fromEntries(questions.value.map((question) => [question.id, emptySurveyAnswer(question)]))
     emit('loaded', data)
+    restoreDraft()
   } catch (loadError) {
     if (requestId === loadRequestId) error.value = loadError?.message || '问卷读取失败'
   } finally {
     if (requestId === loadRequestId) loading.value = false
   }
+}
+
+// userId 可能比问卷详情晚到，两者都齐了才恢复草稿；用户已经开始作答就不再覆盖
+function restoreDraft() {
+  if (draftReady || !detail.value || !props.userId) return
+  draftReady = true
+  if (answeredCount.value > 0) return
+
+  const draft = readSurveyDraft(localStorage, props.userId, props.surveyId)
+  if (!draft) return
+  answers.value = restoreSurveyAnswers(questions.value, draft)
+  restoredDraft.value = answeredCount.value > 0
 }
 
 function requestSubmit() {
@@ -127,6 +162,7 @@ async function confirmSubmit() {
     assertUcloudOk(result, '提交问卷')
 
     submitted.value = true
+    removeSurveyDraft(localStorage, props.userId, props.surveyId)
     emit('submitted', props.surveyId)
   } catch (submitFailure) {
     submitError.value = submitFailure?.message || '提交失败'
@@ -137,6 +173,16 @@ async function confirmSubmit() {
 }
 
 watch(() => [props.surveyId, props.token], loadSurvey, { immediate: true })
+watch(() => props.userId, restoreDraft)
+watch(
+  answers,
+  () => {
+    if (draftReady && !isSubmitted.value) {
+      writeSurveyDraft(localStorage, props.userId, props.surveyId, questions.value, answers.value)
+    }
+  },
+  { deep: true },
+)
 </script>
 
 <template>
@@ -146,18 +192,20 @@ watch(() => [props.surveyId, props.token], loadSurvey, { immediate: true })
         <h2>问卷内容</h2>
         <p>{{ subtitle }}</p>
       </div>
-      <span v-if="questions.length && !submitted" class="section-count">
+      <span v-if="questions.length && !isSubmitted" class="section-count">
         已答 {{ answeredCount }}/{{ questions.length }}
       </span>
     </div>
 
     <div v-if="loading" class="list-placeholder" role="status">正在读取问卷</div>
     <section v-else-if="error" class="notice error">{{ error }}</section>
-    <section v-else-if="submitted" class="notice success">问卷已提交。</section>
+    <section v-else-if="isSubmitted" class="notice success">问卷已提交。</section>
 
     <form v-else-if="detail" class="survey-form" @submit.prevent="requestSubmit">
       <div v-if="detail.description && isHtml(detail.description)" class="survey-description" v-html="detail.description" />
       <p v-else-if="detail.description" class="survey-description">{{ detail.description }}</p>
+
+      <section v-if="restoredDraft" class="notice">已恢复上次没提交的答案。</section>
 
       <section v-if="hasUnsupportedQuestion" class="notice warning">
         问卷里有暂不支持的题型，请
@@ -224,6 +272,7 @@ watch(() => [props.surveyId, props.token], loadSurvey, { immediate: true })
       </div>
       <div v-else class="submit-actions">
         <button :disabled="hasUnsupportedQuestion || !userId" type="submit">提交问卷</button>
+        <span class="survey-draft-hint">答案会自动保存在本机，提交前离开也不会丢</span>
       </div>
     </form>
   </section>

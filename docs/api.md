@@ -193,6 +193,8 @@ https://apiucloud.bupt.edu.cn/ykt-basics/info
 
 本地开发时把远程 host 换成 `/ucloud`，由 Hono 后端代理到 `https://apiucloud.bupt.edu.cn`。
 
+接口返回的时间（如 `assignmentEndTime`、`endTime`、`endAt`）都是不带时区的北京时间，格式为 `2026-11-15 00:00` 或 `2026-11-15 00:00:00`。前端用 `parseBeijingTime` 按 +08:00 解析，设备在其他时区时截止判断也不会偏移。
+
 #### 用户信息
 
 ```http
@@ -552,7 +554,7 @@ Content-Type: application/json
 POST https://apiucloud.bupt.edu.cn/ykt-activity/survey/submit-answer
 ```
 
-整份问卷一次提交，每题一条：单选填选项字母，多选用逗号拼接选项字母，主观题填文本（官方页面限 200 字）。官方页面要求全部作答后才能提交，提交后不能修改；失败时返回 `code: 400` 和 `msg`。格式取自官方作答页的代码，提交本身尚未用真实问卷验证过。
+整份问卷一次提交，每题一条：单选填选项字母，多选用逗号拼接选项字母，主观题填文本（官方页面限 200 字）。官方页面要求全部作答后才能提交，提交后不能修改；失败时返回 `code: 400` 和 `msg`。格式取自官方作答页的代码，2026-10-30 已在本应用里用真实问卷提交成功。
 
 #### 测验列表
 
