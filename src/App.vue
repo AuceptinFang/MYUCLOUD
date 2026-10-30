@@ -17,6 +17,8 @@ import {
   getCourseResources,
   getResourcesById,
   getStudentCourses,
+  getTodoSurveys,
+  getUnsubmittedQuizzes,
   getUserInfo,
   loginWithCredentials,
   pickToken,
@@ -30,9 +32,10 @@ import AssignmentDetailPanel from './components/common/AssignmentDetailPanel.vue
 import CourseGrid from './components/common/CourseGrid.vue'
 import CourseResourcePanel from './components/common/CourseResourcePanel.vue'
 import DeadlineList from './components/common/DeadlineList.vue'
+import SurveyPanel from './components/common/SurveyPanel.vue'
 import AppShell from './components/layout/AppShell.vue'
 import { usePlugins } from './plugin/index.js'
-import { isSubmitViewSubmitted, normalizeAssignment, sortAssignments } from './utils/deadline'
+import { isSubmitViewSubmitted, normalizeAssignment, normalizeQuiz, normalizeSurvey, sortAssignments } from './utils/deadline'
 import FeedbackDialog from './components/common/FeedbackDialog.vue'
 import { buildFeedbackReport, collectKnownSecrets } from './utils/feedback-report.js'
 import { jwglSessionId } from './api/jwgl.js'
@@ -47,6 +50,7 @@ const TimetablePage = defineAsyncComponent(() => import('./components/common/Tim
 const activeView = ref(getViewFromHash())
 const routeCourseId = ref(getRouteCourseId())
 const routeAssignmentId = ref(getRouteAssignmentId())
+const routeSurveyId = ref(getRouteSurveyId())
 const plugins = usePlugins()
 const pluginViews = computed(() => new Set(plugins.map((p) => p.view)))
 const username = ref('')
@@ -83,6 +87,11 @@ const uploadProgress = ref(null)
 const uploadedAttachmentCache = new Map()
 let submitController = null
 const assignments = ref([])
+// 待填的问卷和待做的测验，和作业一起排进首页待办
+const activityTasks = ref([])
+// 当前作答的问卷；提交后会从待办移除，这里保留标题等信息给页头用
+const selectedSurvey = ref(null)
+const surveyTitle = ref('')
 const includeCompleted = ref(false)
 const assignmentPageSize = ref(20)
 const lastLoadedAt = ref('')
@@ -90,9 +99,10 @@ let courseResourceRequestId = 0
 let courseAssignmentRequestId = 0
 let assignmentDetailRequestId = 0
 
+const todoItems = computed(() => sortAssignments([...assignments.value, ...activityTasks.value]))
 // 往期未交（level missed）只在打开“显示已提交与往期”时列出，不计入待完成
 const pendingAssignments = computed(() =>
-  assignments.value.filter((assignment) => !assignment.isCompleted && !assignment.isMissed),
+  todoItems.value.filter((assignment) => !assignment.isCompleted && !assignment.isMissed),
 )
 const urgentAssignments = computed(() =>
   pendingAssignments.value.filter((assignment) => assignment.level === 'danger' || assignment.level === 'warning'),
@@ -101,7 +111,7 @@ const overdueAssignments = computed(() =>
   pendingAssignments.value.filter((assignment) => assignment.level === 'overdue'),
 )
 const visibleAssignments = computed(() =>
-  assignments.value
+  todoItems.value
     .filter((assignment) => includeCompleted.value || (!assignment.isCompleted && !assignment.isMissed))
     .slice(0, Number(assignmentPageSize.value) || 20),
 )
@@ -167,6 +177,7 @@ function getViewFromHash() {
   if (hash === '#debug') return debugEnabled ? 'debug' : 'study'
   if (hash.startsWith('#course/')) return 'course'
   if (hash.startsWith('#assignment/')) return 'assignment'
+  if (hash.startsWith('#survey/')) return 'survey'
   if (hash.startsWith('#') && hash.length > 1) return hash.slice(1)
 
   return 'study'
@@ -182,6 +193,12 @@ function getRouteAssignmentId() {
   if (!window.location.hash.startsWith('#assignment/')) return ''
 
   return decodeURIComponent(window.location.hash.slice('#assignment/'.length))
+}
+
+function getRouteSurveyId() {
+  if (!window.location.hash.startsWith('#survey/')) return ''
+
+  return decodeURIComponent(window.location.hash.slice('#survey/'.length))
 }
 
 function setCourseHash(courseId) {
@@ -274,6 +291,14 @@ function syncViewFromHash() {
   activeView.value = getViewFromHash()
   routeCourseId.value = getRouteCourseId()
   routeAssignmentId.value = getRouteAssignmentId()
+  routeSurveyId.value = getRouteSurveyId()
+
+  if (activeView.value === 'survey' && selectedSurvey.value?.activityId !== routeSurveyId.value) {
+    surveyTitle.value = ''
+    selectedSurvey.value =
+      activityTasks.value.find((task) => task.kind === 'survey' && task.activityId === routeSurveyId.value) || null
+    return
+  }
 
   if (activeView.value === 'course' && routeCourseId.value) {
     if (getCourseId(selectedCourse.value) === routeCourseId.value) return
@@ -663,7 +688,10 @@ async function loadStudyData() {
     log('study:courses:response', courseCall.result)
     checkAuth(courseCall.result, '课程列表')
     courses.value = courseCall.result.body?.data?.records || []
-    const assignmentCourseMap = await buildAssignmentCourseMap(courses.value)
+    const [assignmentCourseMap, nextActivityTasks] = await Promise.all([
+      buildAssignmentCourseMap(courses.value),
+      loadActivityTasks(user.id, courses.value),
+    ])
 
     const assignmentCall = await getAssignments(bladeToken.value, {
       current: 1,
@@ -683,6 +711,7 @@ async function loadStudyData() {
         })
       }),
     )
+    activityTasks.value = nextActivityTasks
 
     lastLoadedAt.value = new Date().toLocaleString()
     syncViewFromHash()
@@ -692,6 +721,51 @@ async function loadStudyData() {
   } finally {
     loadingStudy.value = false
   }
+}
+
+// 问卷和测验只做提醒，读不到时不影响作业列表
+async function loadActivityTasks(userId, courseRecords) {
+  const courseNames = new Map(courseRecords.map((course) => [getCourseId(course), getCourseName(course)]))
+
+  const surveyCalls = [1, 2].map(async (level) => {
+    try {
+      const surveyCall = await getTodoSurveys(bladeToken.value, { userId, level })
+      log('study:surveys:start', surveyCall.request)
+      log('study:surveys:response', surveyCall.result)
+      checkAuth(surveyCall.result, '问卷列表')
+
+      return (surveyCall.result.body?.data?.records || []).map((record) =>
+        normalizeSurvey(record, courseNames.get(String(record.siteId))),
+      )
+    } catch (error) {
+      logError('study:surveys:error', error)
+      return []
+    }
+  })
+
+  const quizCalls = courseRecords.map(async (course) => {
+    const courseId = getCourseId(course)
+    if (!courseId) return []
+
+    try {
+      const quizCall = await getUnsubmittedQuizzes(bladeToken.value, courseId)
+      log('study:quizzes:start', quizCall.request)
+      log('study:quizzes:response', quizCall.result)
+      checkAuth(quizCall.result, '测验列表')
+
+      return (quizCall.result.body?.data?.records || []).map((record) =>
+        normalizeQuiz(record, { courseId, courseName: getCourseName(course) }),
+      )
+    } catch (error) {
+      logError('study:quizzes:error', error)
+      return []
+    }
+  })
+
+  const tasks = (await Promise.all([...surveyCalls, ...quizCalls])).flat()
+
+  // 截止后问卷和测验都没法再作答，不再列出
+  return tasks.filter((task) => !task.isOverdue)
 }
 
 async function loadCourseResources(course) {
@@ -986,6 +1060,33 @@ function backToCourse(panel) {
   }
 }
 
+function openTodoItem(item) {
+  if (item.kind === 'survey') {
+    openSurvey(item)
+    return
+  }
+
+  openAssignment(item)
+}
+
+function openSurvey(survey) {
+  selectedSurvey.value = survey
+  surveyTitle.value = ''
+  activeView.value = 'survey'
+  routeSurveyId.value = survey.activityId
+  window.location.hash = `#survey/${encodeURIComponent(survey.activityId)}`
+}
+
+function handleSurveySubmitted(surveyId) {
+  log('study:survey-submitted', { surveyId })
+  activityTasks.value = activityTasks.value.filter(
+    (task) => !(task.kind === 'survey' && task.activityId === surveyId),
+  )
+  if (selectedSurvey.value?.activityId === surveyId) {
+    selectedSurvey.value = { ...selectedSurvey.value, isCompleted: true, level: 'submitted', status: '已提交' }
+  }
+}
+
 function openAssignment(assignment) {
   const assignmentId = getAssignmentId(assignment)
 
@@ -1230,6 +1331,8 @@ function clearToken() {
   userInfo.value = null
   courses.value = []
   assignments.value = []
+  activityTasks.value = []
+  selectedSurvey.value = null
   resetCourseResources()
   resetCourseAssignments()
   resetAssignmentDetail()
@@ -1353,12 +1456,13 @@ onUnmounted(() => {
         <DeadlineList
           v-model:include-completed="includeCompleted"
           v-model:page-size="assignmentPageSize"
+          title="待办"
           :assignments="visibleAssignments"
           :last-loaded-at="lastLoadedAt"
           :loading="loadingStudy"
           :loading-assignment-id="loadingAssignmentId"
           :selected-assignment-id="selectedAssignmentId"
-          @select="openAssignment"
+          @select="openTodoItem"
         />
       </div>
     </template>
@@ -1452,6 +1556,35 @@ onUnmounted(() => {
         :upload-progress="uploadProgress"
         :submitting="submittingAssignment"
         @submit="submitSelectedAssignment"
+      />
+    </template>
+
+    <template v-else-if="activeView === 'survey'">
+      <section class="detail-context">
+        <button class="detail-back" type="button" @click="setView('study')">
+          <span aria-hidden="true">←</span>
+          首页
+        </button>
+        <div class="detail-context-copy">
+          <span class="context-eyebrow">SURVEY</span>
+          <h1>{{ selectedSurvey?.title || surveyTitle || '问卷' }}</h1>
+          <p>{{ selectedSurvey?.courseName || '课程问卷' }}</p>
+        </div>
+        <div class="detail-context-side">
+          <AssignmentStatus
+            v-if="selectedSurvey"
+            :level="selectedSurvey.level"
+            :status="selectedSurvey.status"
+          />
+        </div>
+      </section>
+      <SurveyPanel
+        :survey-id="routeSurveyId"
+        :token="bladeToken"
+        :user-id="String(userInfo?.id || '')"
+        @expired="handleTokenExpiry('survey')"
+        @loaded="surveyTitle = $event.theme || ''"
+        @submitted="handleSurveySubmitted"
       />
     </template>
 

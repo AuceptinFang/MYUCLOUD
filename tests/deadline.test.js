@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { allowsLateSubmission, isRecordCompleted, normalizeAssignment, sortAssignments } from '../src/utils/deadline.js'
+import { allowsLateSubmission, isRecordCompleted, normalizeAssignment, normalizeQuiz, normalizeSurvey, sortAssignments } from '../src/utils/deadline.js'
 
 // 字段组合取自真实账号的作业列表：status 2 进行中 / 3 已截止，assignmentStatus 99 未提交 / 0 已提交 / 1 已批改，
 // isOverTime 1 表示截止后补交。
@@ -62,4 +62,36 @@ test('isOvertimeCommit 决定能否补交，缺失时未知', () => {
   assert.equal(allowsLateSubmission({ isOvertimeCommit: 1 }), true)
   assert.equal(allowsLateSubmission({ data: {} }), null)
   assert.equal(allowsLateSubmission(null), null)
+})
+
+// 字段取自真实账号的问卷待办（survey/page/todo）和测验列表（examination/list-stu）
+test('问卷和测验归一成待办条目，id 加前缀，课程取自课程列表', () => {
+  const survey = normalizeSurvey(
+    { id: '2115715436616708098', siteId: '2091774261643038721', theme: '学期中调查问卷', startTime: daysFromNow(-1), endTime: daysFromNow(10), siteName: '' },
+    '编译原理与技术',
+  )
+  assert.equal(survey.id, 'survey-2115715436616708098')
+  assert.equal(survey.activityId, '2115715436616708098')
+  assert.equal(survey.kindLabel, '问卷')
+  assert.equal(survey.title, '学期中调查问卷')
+  assert.equal(survey.courseId, '2091774261643038721')
+  assert.equal(survey.courseName, '编译原理与技术')
+  assert.equal(survey.level, 'normal')
+  assert.equal(survey.isCompleted, false)
+
+  assert.equal(normalizeSurvey({ id: '1', siteId: -1, theme: '平台问卷', endTime: daysFromNow(3) }).courseId, '')
+
+  const quiz = normalizeQuiz(
+    { id: '2115665119386898433', title: '语法分析单元测试', statusSelf: '未提交', startAt: daysFromNow(0), endAt: daysFromNow(-1), siteId: -1 },
+    { courseId: 'c1', courseName: '编译原理与技术' },
+  )
+  assert.equal(quiz.id, 'quiz-2115665119386898433')
+  assert.equal(quiz.courseId, 'c1')
+  assert.equal(quiz.isOverdue, true)
+})
+
+test('问卷和测验的时间去掉秒，和作业列表一致', () => {
+  const survey = normalizeSurvey({ id: '1', siteId: -1, theme: '问卷', startTime: '2026-10-29 00:00:00', endTime: '2099-11-15 00:00:00' })
+  assert.equal(survey.beginTime, '2026-10-29 00:00')
+  assert.equal(survey.deadline, '2099-11-15 00:00')
 })

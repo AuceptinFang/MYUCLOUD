@@ -166,6 +166,70 @@ export function normalizeAssignment(record) {
   }
 }
 
+// 问卷（type 2）和测验（type 4）只在待办里提醒，作答要去官方页面。
+// 列表只拉未提交的，所以都算未完成；id 加前缀，避免和作业撞号。
+const ACTIVITY_LABELS = { survey: '问卷', quiz: '测验' }
+
+// 问卷和测验的时间带秒，作业列表只到分钟，显示时对齐
+export function trimSeconds(value) {
+  return String(value || '').replace(/(\d{2}:\d{2}):\d{2}$/, '$1')
+}
+
+function normalizeActivity(kind, record, { activityId, title, courseId, courseName, beginTime, deadline }) {
+  const daysLeft = getDaysLeft(deadline)
+  const level = getDeadlineLevel(daysLeft, false)
+
+  return {
+    id: `${kind}-${activityId}`,
+    activityId: String(activityId),
+    kind,
+    kindLabel: ACTIVITY_LABELS[kind],
+    title: title || '无标题',
+    chapter: '',
+    courseId: courseId || '',
+    courseName: courseName || '',
+    beginTime: trimSeconds(beginTime),
+    deadline: trimSeconds(deadline),
+    submitTime: '',
+    daysLeft,
+    level,
+    isUrgent: level === 'danger' || level === 'warning',
+    isOverdue: level === 'overdue',
+    isMissed: false,
+    isLateSubmission: false,
+    isCompleted: false,
+    status: getAssignmentStatus(record, daysLeft, false),
+    raw: record,
+  }
+}
+
+// 课堂级问卷带真实 siteId，平台级问卷的 siteId 是 -1
+export function normalizeSurvey(record, courseName = '') {
+  const siteId = String(record.siteId ?? '')
+  const courseId = hasValue(siteId) && siteId !== '-1' ? siteId : ''
+
+  return normalizeActivity('survey', record, {
+    activityId: record.id,
+    title: record.theme,
+    courseId,
+    courseName: courseName || record.siteName,
+    beginTime: record.startTime,
+    deadline: record.endTime,
+  })
+}
+
+// 测验记录里的 siteId 是 -1，课程取自发起查询的那门课
+export function normalizeQuiz(record, { courseId = '', courseName = '' } = {}) {
+  return normalizeActivity('quiz', record, {
+    activityId: record.id,
+    title: record.title,
+    courseId,
+    courseName,
+    beginTime: record.startAt,
+    deadline: record.endAt,
+  })
+}
+
 function toTimestamp(value) {
   if (!value) return null
   const time = new Date(value).getTime()

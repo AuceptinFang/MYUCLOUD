@@ -10,11 +10,10 @@
 | --- | --- |
 | 课程 | 查看本学期课程、课程详情与资料 |
 | 作业 | 按截止时间分组，查看详情、上传附件和提交 |
+| 问卷与测验 | 待填问卷、待做测验和作业一起列入待办；问卷在应用内作答，测验跳转到 UCloud 官方页面 |
 | 课表 | 同步周课表并缓存在浏览器，断网或退出后仍可查看已同步内容 |
 | 登录 | UCloud 支持统一认证或 Blade-Auth；教务系统使用独立凭证 |
 | 界面 | 桌面端课程、待办分栏，窄屏自动纵向排列；支持保存桌面间距设置 |
-
-问卷和在线测验尚未接入，见[待接入功能](docs/roadmap.md)。
 
 ## 本地启动
 
@@ -86,7 +85,7 @@ docs/                  部署、开发、课表与接口参考
 - [部署说明](docs/deployment.md)：GitHub Pages、后端地址、CORS 和只读预览。
 - [开发说明](docs/development.md)：本地运行、后端结构、Docker、插件与调试页。
 - [课表与教务登录](docs/timetable.md)：同步、缓存、凭证和本地接口。
-- [接口与鉴权参考](docs/api.md)：CAS/OAuth、业务接口、附件和 curl 示例。
-- [待接入功能](docs/roadmap.md)：问卷、在线测验和聚合待办接口。
+- [接口与鉴权参考](docs/api.md)：CAS/OAuth、业务接口（含问卷、测验）、附件和 curl 示例。
+- [待接入功能](docs/roadmap.md)：在应用内作答测验。
 
 界面间距工具来源于 [Perrin UI Kit](https://github.com/94yi/perrin-ui-kit)，许可证位于 [src/vendor/perrin/LICENSE](src/vendor/perrin/LICENSE)。

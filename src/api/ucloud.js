@@ -12,6 +12,10 @@ const API_PATHS = {
   userInfo: '/ucloud/ykt-basics/info',
   courses: '/ucloud/ykt-site/site/list/student/current',
   assignments: '/ucloud/ykt-site/work/student/list',
+  surveyTodo: '/ucloud/ykt-activity/survey/page/todo',
+  surveyDetail: '/ucloud/ykt-activity/survey/detail',
+  surveySubmit: '/ucloud/ykt-activity/survey/submit-answer',
+  quizzes: '/ucloud/ykt-site/examination/list-stu',
   assignmentDetail: '/ucloud/ykt-site/work/detail',
   assignmentSubmit: '/ucloud/ykt-site/work/submit',
   assignmentSubmitView: '/ucloud/ykt-site/work/submit-view',
@@ -165,6 +169,108 @@ export async function getAssignments(token, { current = 1, size = 100, siteId = 
     request,
     result: await readResponse(response),
   }
+}
+
+// 待填问卷。level 必填：1 课堂级、2 平台级；不带 siteId 时返回本人所有课程的问卷
+export async function getTodoSurveys(token, { userId, level }) {
+  const params = new URLSearchParams({
+    level: String(level),
+    current: '1',
+    size: '9999',
+    userId,
+  })
+  const request = {
+    url: `${API_PATHS.surveyTodo}?${params}`,
+    method: 'GET',
+    headers: businessHeaders(token),
+  }
+  const response = await fetchBackend(request.url, {
+    headers: request.headers,
+  })
+
+  return {
+    request,
+    result: await readResponse(response),
+  }
+}
+
+// 问卷详情，题目在 data.questionPage.records；官方页面每页 5 题，这里一次取完
+export async function getSurveyDetail(token, surveyId) {
+  const params = new URLSearchParams({
+    id: surveyId,
+    current: '1',
+    size: '999',
+  })
+  const request = {
+    url: `${API_PATHS.surveyDetail}?${params}`,
+    method: 'GET',
+    headers: businessHeaders(token),
+  }
+  const response = await fetchBackend(request.url, {
+    headers: request.headers,
+  })
+
+  return {
+    request,
+    result: await readResponse(response),
+  }
+}
+
+// 提交整份问卷的答案，格式见 buildSurveyAnswers；提交后不能修改
+export async function submitSurveyAnswers(token, answers) {
+  const request = {
+    url: API_PATHS.surveySubmit,
+    method: 'POST',
+    headers: businessHeaders(token, { 'Content-Type': 'application/json' }),
+    body: answers,
+  }
+  const response = await fetchBackend(request.url, {
+    method: request.method,
+    headers: request.headers,
+    body: JSON.stringify(request.body),
+  })
+
+  return {
+    request,
+    result: await readResponse(response),
+  }
+}
+
+// 测验列表必须带 siteId，只能按课程逐个查；statusSelf 只滤未提交，已经结束的也会返回
+export async function getUnsubmittedQuizzes(token, siteId) {
+  const params = new URLSearchParams({
+    current: '1',
+    size: '9999',
+    status: '-1',
+    state: '-1',
+    statusSelf: '未提交',
+    siteId,
+  })
+  const request = {
+    url: `${API_PATHS.quizzes}?${params}`,
+    method: 'GET',
+    headers: businessHeaders(token),
+  }
+  const response = await fetchBackend(request.url, {
+    headers: request.headers,
+  })
+
+  return {
+    request,
+    result: await readResponse(response),
+  }
+}
+
+const UCLASS_URL = 'https://ucloud.bupt.edu.cn/uclass'
+
+// 问卷和测验要在官方页面作答，跳转地址和官方首页待办的一致
+export function buildActivityUrl(item) {
+  const id = encodeURIComponent(item?.activityId || '')
+  if (!id) return ''
+  if (item.kind === 'survey') return `${UCLASS_URL}/index.html#/student/survey/participateSurvey_fullpage?id=${id}`
+  if (item.kind === 'quiz') return `${UCLASS_URL}/course.html#/answer?id=${id}`
+
+  return ''
 }
 
 export async function getCourseResources(token, { siteId, userId }) {

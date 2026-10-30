@@ -2,27 +2,14 @@
 
 [返回 README](../README.md)
 
-## 问卷与测验
+## 在应用内作答测验
 
-目前已支持作业（bizType / type = 3），云平台还有另外两种任务类型未接入：
+待做测验已经列入首页待办，点开后跳转到 UCloud 官方页面作答。问卷已经可以在应用内作答。
 
-| 类型 | bizType | 说明 | 接口 |
-|---|---|---|---|
-| 问卷 | 2 | 待完成调查问卷 | `GET /ucloud/ykt-activity/survey/page/todo?level=1&size=9999999&userId=<userId>&siteId=<siteId>` |
-| 测验 | 4 | 待完成在线测验 | `GET /ucloud/ykt-site/examination/list-stu?current=1&size=999999&status=-1&siteId=<siteId>&statusSelf=未提交&state=-1` |
+测验作答还没有做，接口流程见[接口与鉴权参考](api.md#测验作答未接入)。难点：
 
-此外还有一个聚合接口，可以一次性拉回三种类型的待办列表：
+- 进入试卷（`enter-paper`）就开始计时，没法在不占用一次作答的情况下拿到真实试卷结构；
+- 六种题型的 `values` 格式（选项 id 还是字母、填空和主观题的结构）需要用真实试卷核对；
+- 需要倒计时、逐题保存和超时自动交卷，出错会直接影响成绩。
 
-```text
-GET /ucloud/ykt-site/site/student/undone?userId=<userId>
-```
-
-返回 `data.undoneList`，每条含 `activityId`、`type`（2/3/4）、`endTime`、`activityName`，已经关联好 `courseInfo`（`id`、`name`、`teachers`），不需要像 `/search` 那样遍历课程反向匹配。
-
-远程路径：
-
-| 代理路径 | 远程 |
-|---|---|
-| `/ucloud/ykt-site/site/student/undone?...` | `https://apiucloud.bupt.edu.cn/ykt-site/site/student/undone?...` |
-| `/ucloud/ykt-activity/survey/page/todo?...` | `https://apiucloud.bupt.edu.cn/ykt-activity/survey/page/todo?...` |
-| `/ucloud/ykt-site/examination/list-stu?...` | `https://apiucloud.bupt.edu.cn/ykt-site/examination/list-stu?...` |
+下次有测验开放时，可以在官方答题页打开浏览器开发者工具，把 `enter-paper` 和 `member-answers` 的请求与响应保存下来，据此实现。

@@ -364,6 +364,21 @@ summary:focus-visible {
   line-height: 1.6;
   overflow-wrap: anywhere;
 }
+a.feed-assignment {
+  text-decoration: none;
+}
+.feed-kind {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--cloud-blue-soft);
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 20px;
+  vertical-align: 1px;
+}
 .feed-assignment-meta {
   color: var(--muted);
   font-size: 12px;
@@ -659,6 +674,7 @@ summary:focus-visible {
   .study-columns .course-section {
     order: 1;
   }
+  .section-header,
   .study-columns .section-header {
     flex-direction: row;
     align-items: center;
@@ -703,4 +719,111 @@ summary:focus-visible {
   .token-form label {
     grid-column: 1 / -1;
   }
+}
+/* 问卷作答 */
+.survey-form {
+  display: grid;
+  gap: 18px;
+}
+.survey-description {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.survey-questions {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.survey-question {
+  display: grid;
+  gap: 12px;
+  padding: 18px 0;
+  border-bottom: 1px solid #edf0f3;
+}
+.survey-question:first-child {
+  padding-top: 0;
+}
+.survey-question.missing {
+  padding-left: 14px;
+  box-shadow: inset 2px 0 0 var(--deadline-red);
+}
+.survey-question.missing:first-child {
+  padding-top: 4px;
+}
+.survey-question-title {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.6;
+}
+.survey-question-index {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.survey-question-title .feed-kind {
+  flex-shrink: 0;
+  margin-right: 2px;
+}
+.survey-question-trunk {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.survey-options {
+  display: grid;
+  gap: 8px;
+}
+.survey-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: white;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.6;
+  cursor: pointer;
+}
+.survey-option:hover {
+  background: #f8fafc;
+}
+.survey-option:has(input:checked) {
+  border-color: var(--primary);
+  background: var(--cloud-blue-soft);
+}
+.survey-option input {
+  flex-shrink: 0;
+  width: auto;
+  margin: 4px 0 0;
+  padding: 0;
+  accent-color: var(--primary);
+}
+.survey-option input:focus {
+  box-shadow: none;
+}
+.survey-text {
+  gap: 6px;
+  font-weight: 400;
+}
+.survey-text textarea {
+  min-height: 96px;
+}
+.survey-text span {
+  justify-self: end;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.survey-confirm span {
+  color: var(--ink);
+  font-size: 13px;
 }

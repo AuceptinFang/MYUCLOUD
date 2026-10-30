@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { buildFileUrl, buildPreviewUrl, isVideoResource } from './ucloud.js'
+import { buildActivityUrl, buildFileUrl, buildPreviewUrl, isVideoResource } from './ucloud.js'
 
 test('MP4 with an encoded Chinese download name uses the file proxy without changing its query', () => {
   const path = '/ucloud/video/cad0ff6026c752b9bc13ce986e958329.mp4'
@@ -36,4 +36,16 @@ test('file proxy conversion leaves other origins and existing proxy URLs intact'
   ]) {
     assert.equal(buildFileUrl(url), url)
   }
+})
+
+test('问卷和测验链到官方首页待办使用的页面', () => {
+  assert.equal(
+    buildActivityUrl({ kind: 'survey', activityId: '2115715436616708098' }),
+    'https://ucloud.bupt.edu.cn/uclass/index.html#/student/survey/participateSurvey_fullpage?id=2115715436616708098',
+  )
+  assert.equal(
+    buildActivityUrl({ kind: 'quiz', activityId: '2115665119386898433' }),
+    'https://ucloud.bupt.edu.cn/uclass/course.html#/answer?id=2115665119386898433',
+  )
+  assert.equal(buildActivityUrl({ id: '1' }), '')
 })

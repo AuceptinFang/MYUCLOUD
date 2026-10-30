@@ -492,6 +492,129 @@ POST https://apiucloud.bupt.edu.cn/ykt-site/site-resource/tree/student?siteId=<c
 
 外部链接附件的 `type` 为 `2`，`resource` 可以是空对象，标题和地址分别在 `siteResourceLink.title` 与 `siteResourceLink.link`。页面显示链接标题并在新标签页打开，不调用文件预览或下载接口。`recommendLearnTime` 为 `-1` 等非正数时不显示建议学习时长。
 
+#### 待填问卷
+
+```http
+GET /ucloud/ykt-activity/survey/page/todo?level=1&current=1&size=9999&userId=<userId>
+Blade-Auth: <access_token>
+Authorization: Basic c3dvcmQ6c3dvcmRfc2VjcmV0
+Tenant-Id: 000000
+```
+
+远程路径：
+
+```text
+GET https://apiucloud.bupt.edu.cn/ykt-activity/survey/page/todo?level=1&current=1&size=9999&userId=<userId>
+```
+
+`level` 必填，`1` 是课堂级问卷，`2` 是平台级问卷，缺少时返回 400“缺少必要的请求参数: level”。不传 `siteId` 时返回本人所有课程待填的问卷，传 `siteId` 只返回单个课程的。
+
+返回的问卷数组在 `data.records`，常用字段：`id`、`siteId`（课堂级为课程 ID）、`theme`（标题）、`description`、`startTime`、`endTime`（格式 `2026-11-15 00:00:00`）。只返回未填的问卷。
+
+#### 问卷详情
+
+```http
+GET /ucloud/ykt-activity/survey/detail?id=<问卷 id>&current=1&size=999
+Blade-Auth: <access_token>
+Authorization: Basic c3dvcmQ6c3dvcmRfc2VjcmV0
+Tenant-Id: 000000
+```
+
+远程路径：
+
+```text
+GET https://apiucloud.bupt.edu.cn/ykt-activity/survey/detail?id=<问卷 id>&current=1&size=999
+```
+
+`data` 带问卷信息（`theme`、`description`、`style`：`1` 实名、`2` 匿名、`startTime`、`endTime`），题目分页放在 `data.questionPage.records`。官方页面每页 5 题，`size` 调大可以一次取完。
+
+每道题常用字段：`id`、`type`（`1` 单选、`2` 多选、`3` 主观）、`sort`、`trunk`（题干，可能含 HTML）、`optionVOList`（选项，每项有 `id`、`opt`（选项字母）、`content`（已带 `A.` 前缀））。
+
+#### 提交问卷
+
+```http
+POST /ucloud/ykt-activity/survey/submit-answer
+Blade-Auth: <access_token>
+Authorization: Basic c3dvcmQ6c3dvcmRfc2VjcmV0
+Tenant-Id: 000000
+Content-Type: application/json
+
+[
+  { "answer": "B", "type": 1, "questionId": "<题目 id>", "userId": "<userId>" },
+  { "answer": "A,C,E", "type": 2, "questionId": "<题目 id>", "userId": "<userId>" },
+  { "answer": "主观题文本", "type": 3, "questionId": "<题目 id>", "userId": "<userId>" }
+]
+```
+
+远程路径：
+
+```text
+POST https://apiucloud.bupt.edu.cn/ykt-activity/survey/submit-answer
+```
+
+整份问卷一次提交，每题一条：单选填选项字母，多选用逗号拼接选项字母，主观题填文本（官方页面限 200 字）。官方页面要求全部作答后才能提交，提交后不能修改；失败时返回 `code: 400` 和 `msg`。格式取自官方作答页的代码，提交本身尚未用真实问卷验证过。
+
+#### 测验列表
+
+```http
+GET /ucloud/ykt-site/examination/list-stu?current=1&size=9999&status=-1&state=-1&statusSelf=未提交&siteId=<courseId>
+Blade-Auth: <access_token>
+Authorization: Basic c3dvcmQ6c3dvcmRfc2VjcmV0
+Tenant-Id: 000000
+```
+
+远程路径：
+
+```text
+GET https://apiucloud.bupt.edu.cn/ykt-site/examination/list-stu?current=1&size=9999&status=-1&state=-1&statusSelf=未提交&siteId=<courseId>
+```
+
+`siteId` 必填，缺少时返回 400，所以只能按课程逐个查。`statusSelf` 可省略，省略时返回该课程全部测验，常见取值有 `未提交`、`已评分`。
+
+返回的测验数组在 `data.records`，常用字段：`id`、`title`、`startAt`、`endAt`、`statusSelf`、`score`（未评分为 `-1`）。记录里的 `siteId` 是 `-1`，课程要以查询时传的 `siteId` 为准。已经结束但没有提交的测验也会出现在 `statusSelf=未提交` 的结果里，页面按 `endAt` 过滤掉。
+
+#### 聚合待办（未使用）
+
+```http
+GET /ucloud/ykt-site/site/student/undone?userId=<userId>
+Blade-Auth: <access_token>
+Authorization: Basic c3dvcmQ6c3dvcmRfc2VjcmV0
+Tenant-Id: 000000
+```
+
+远程路径：
+
+```text
+GET https://apiucloud.bupt.edu.cn/ykt-site/site/student/undone?userId=<userId>
+```
+
+官方首页的待办列表用的就是这个接口。返回 `data.siteNum`、`data.undoneNum` 和 `data.undoneList`，每条含 `activityId`、`activityName`、`type`（`2` 问卷、`3` 作业、`4` 测验）、`endTime`、`assignmentType`、`evaluationStatus`、`isOpenEvaluation`。
+
+实测记录里没有课程信息：`siteId` 一律是 `-1`，`siteName` 只有问卷带课程名，作业为空字符串。作业已经由作业列表覆盖，问卷和测验分别用待填问卷、测验列表两个接口能拿到课程，所以本项目没有使用它。
+
+#### 测验作答（未接入）
+
+以下接口取自官方答题页（`course.html#/answer`）的代码，没有用真实测验验证过：
+
+| 步骤 | 接口 | 说明 |
+| --- | --- | --- |
+| 进入试卷 | `POST /ykt-site/answersheet/enter-paper?examinationId=<测验 id>` | 返回 `data.paperParts[].paperTrees[]`，题目在 `questionCombinationDTO`，`examTime` 为分钟；进入后开始计时 |
+| 保存单题 | `POST /ykt-site/answersheet/member-answers` | `{ examinationId, answerSheetList: [{ questiontId, values, resourceIds }] }`，每题单独保存 |
+| 检查漏答 | `GET /ykt-site/answersheet/query-no-submit?examinationId=<测验 id>` | 交卷前提示未作答的题 |
+| 交卷 | `POST /ykt-site/answersheet/submit-exam?examinationId=<测验 id>&auto=false` | 超时自动交卷时 `auto=true` |
+| 查看已评卷面 | `GET /ykt-site/answersheet/have-read-paper-stu?...` | 已评分测验的卷面与得分 |
+
+题型 `questionType`：`1` 单选、`2`/`3` 多选、`4` 填空、`5` 判断、`6` 主观（可附文件，附件以 `bizType: 8` 上传）。注意参数名是 `questiontId`，官方代码里就多一个 `t`。
+
+#### 官方作答页面
+
+测验在本项目里只做提醒，点开后跳转到官方页面作答。地址与官方首页待办的跳转一致（问卷已在应用内作答，官方地址仅在遇到不支持的题型时使用）：
+
+| 类型 | 地址 |
+| --- | --- |
+| 问卷 | `https://ucloud.bupt.edu.cn/uclass/index.html#/student/survey/participateSurvey_fullpage?id=<问卷 id>` |
+| 测验 | `https://ucloud.bupt.edu.cn/uclass/course.html#/answer?id=<测验 id>` |
+
 ## curl 示例
 
 下面示例只展示流程。不要把真实密码写进脚本仓库。
