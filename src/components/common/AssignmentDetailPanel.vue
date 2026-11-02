@@ -543,115 +543,8 @@ function submitAssignment() {
           <p v-if="getAssignmentDescription(assignment, detail)">
             {{ getAssignmentDescription(assignment, detail) }}
           </p>
-          <div
-            v-if="hasCommentText(getAssignmentComment(assignment, detail, submitView))"
-            class="assignment-comment-box"
-          >
-            <span class="assignment-comment-label">教师评语</span>
-            {{ getAssignmentComment(assignment, detail, submitView) }}
-          </div>
         </div>
       </div>
-
-      <section v-if="submissionClosed" class="notice warning submission-closed">
-        <strong>已截止，不能再提交</strong>
-        <span>{{ assignment.isCompleted ? '截止时间已过，学校不允许修改已提交的内容。' : '截止时间已过，教师没有开放补交。如需补交请联系老师。' }}</span>
-      </section>
-
-      <form
-        v-else
-        class="assignment-submit-box"
-        :class="{ 'drag-active': dragActive }"
-        @submit.prevent="submitAssignment"
-        @dragenter.prevent="onDragEnter"
-        @dragover.prevent="onDragOver"
-        @dragleave="onDragLeave"
-        @drop.prevent="onDrop"
-      >
-        <div class="subsection-header">
-          <div>
-            <strong>{{ isPastDeadline ? '补交作业' : '提交作业' }}</strong>
-            <span v-if="isPastDeadline && lateSubmissionAllowed">已过截止时间，教师允许补交，提交后会记为补交</span>
-            <span v-else-if="isPastDeadline">已过截止时间，未能确认是否允许补交，学校可能拒绝这次提交</span>
-            <span v-else>填写内容或添加附件后提交，可直接把文件拖到这里</span>
-          </div>
-        </div>
-
-        <label class="submit-content">
-          提交内容
-          <textarea
-            v-model="assignmentContent"
-            placeholder="输入本次作业提交内容"
-            spellcheck="false"
-          />
-        </label>
-
-        <div class="submit-actions">
-          <label class="file-picker">
-            <input ref="fileInput" multiple type="file" @change="updatePickedFiles" />
-            <span>选择文件</span>
-          </label>
-          <button :disabled="submitting" type="submit">
-            {{ submitting ? '提交中' : '提交' }}
-          </button>
-          <button
-            v-if="pickedFiles.length > 0"
-            class="button-secondary"
-            type="button"
-            @click="clearPickedFiles"
-          >
-            清空
-          </button>
-        </div>
-
-        <div v-if="pickedFiles.length > 0" class="picked-file-list">
-          <div v-for="file in pickedFiles" :key="fileKey(file)" class="picked-file-row">
-            <strong>{{ file.name }}</strong>
-            <span>{{ formatFileSize(file.size) }}</span>
-            <button
-              :disabled="submitting"
-              class="picked-file-remove"
-              title="移除"
-              type="button"
-              @click="removePickedFile(file)"
-            >×</button>
-          </div>
-        </div>
-        <button
-          v-else
-          :disabled="submitting"
-          class="file-drop-zone"
-          type="button"
-          @click="fileInput?.click()"
-        >
-          <strong>拖拽文件到此处</strong>
-          <span>或点击选择文件，支持多个</span>
-        </button>
-
-        <div v-if="dragActive" class="drop-overlay" aria-hidden="true">
-          <strong>松开即可添加附件</strong>
-        </div>
-
-        <p v-if="pickedTotalSize >= LARGE_UPLOAD_BYTES && !submitting" class="upload-hint">
-          附件共 {{ formatFileSize(pickedTotalSize) }}，网络较慢时可能需要几分钟，上传期间请不要离开此页面。
-        </p>
-
-        <section v-if="submitting && uploadProgress" class="upload-progress" aria-live="polite">
-          <div class="upload-progress-bar"><span :style="{ width: `${uploadPercent}%` }" /></div>
-          <span>{{ uploadProgressText }}</span>
-        </section>
-
-        <section v-if="submitError" class="notice error">
-          {{ submitError }}
-          <template v-if="pickedFiles.length > 0">已上传成功的附件再次提交时不会重复上传。</template>
-        </section>
-        <section v-else-if="submitResult?.confirmed" class="notice success">
-          学校已确认收到提交{{ submitResult.submitTime ? `（${submitResult.submitTime}）` : '' }}{{ submitResult.attachmentCount ? `，附件 ${submitResult.attachmentCount} 个` : '' }}。
-        </section>
-        <section v-else-if="submitResult" class="notice warning">
-          提交请求已发出，但暂未在学校查到提交记录。请稍后刷新作业列表确认，必要时在企业微信云邮中核对。
-        </section>
-      </form>
 
       <section class="assignment-resources">
         <div class="subsection-header">
@@ -693,6 +586,114 @@ function submitAssignment() {
           </div>
         </div>
       </section>
+
+      <div
+        v-if="hasCommentText(getAssignmentComment(assignment, detail, submitView))"
+        class="assignment-comment-box"
+      >
+        <span class="assignment-comment-label">教师评语</span>
+        {{ getAssignmentComment(assignment, detail, submitView) }}
+      </div>
+
+      <section v-if="submissionClosed" class="notice warning submission-closed">
+        <strong>已截止，不能再提交</strong>
+        <span>{{ assignment.isCompleted ? '截止时间已过，学校不允许修改已提交的内容。' : '截止时间已过，教师没有开放补交。如需补交请联系老师。' }}</span>
+      </section>
+
+      <form
+        v-else
+        class="assignment-submit-box"
+        :class="{ 'drag-active': dragActive }"
+        @submit.prevent="submitAssignment"
+        @dragenter.prevent="onDragEnter"
+        @dragover.prevent="onDragOver"
+        @dragleave="onDragLeave"
+        @drop.prevent="onDrop"
+      >
+        <div class="subsection-header">
+          <div>
+            <strong>{{ isPastDeadline ? '补交作业' : '提交作业' }}</strong>
+            <span v-if="isPastDeadline && lateSubmissionAllowed">已过截止时间，教师允许补交，提交后会记为补交</span>
+            <span v-else-if="isPastDeadline">已过截止时间，未能确认是否允许补交，学校可能拒绝这次提交</span>
+            <span v-else>填写内容或添加附件后提交，可直接把文件拖到这里</span>
+          </div>
+        </div>
+
+        <label class="submit-content">
+          提交内容
+          <textarea
+            v-model="assignmentContent"
+            placeholder="输入本次作业提交内容"
+            spellcheck="false"
+          />
+        </label>
+
+        <div v-if="pickedFiles.length > 0" class="picked-file-list">
+          <div v-for="file in pickedFiles" :key="fileKey(file)" class="picked-file-row">
+            <strong>{{ file.name }}</strong>
+            <span>{{ formatFileSize(file.size) }}</span>
+            <button
+              :disabled="submitting"
+              class="picked-file-remove"
+              title="移除"
+              type="button"
+              @click="removePickedFile(file)"
+            >×</button>
+          </div>
+        </div>
+        <button
+          v-else
+          :disabled="submitting"
+          class="file-drop-zone"
+          type="button"
+          @click="fileInput?.click()"
+        >
+          <strong>拖拽文件到此处</strong>
+          <span>或点击选择文件，支持多个</span>
+        </button>
+
+        <div v-if="dragActive" class="drop-overlay" aria-hidden="true">
+          <strong>松开即可添加附件</strong>
+        </div>
+
+        <p v-if="pickedTotalSize >= LARGE_UPLOAD_BYTES && !submitting" class="upload-hint">
+          附件共 {{ formatFileSize(pickedTotalSize) }}，网络较慢时可能需要几分钟，上传期间请不要离开此页面。
+        </p>
+
+        <section v-if="submitting && uploadProgress" class="upload-progress" aria-live="polite">
+          <div class="upload-progress-bar"><span :style="{ width: `${uploadPercent}%` }" /></div>
+          <span>{{ uploadProgressText }}</span>
+        </section>
+
+        <div class="submit-actions assignment-submit-actions">
+          <label class="file-picker">
+            <input ref="fileInput" multiple type="file" @change="updatePickedFiles" />
+            <span>选择文件</span>
+          </label>
+          <button
+            v-if="pickedFiles.length > 0"
+            class="button-secondary"
+            type="button"
+            @click="clearPickedFiles"
+          >
+            清空
+          </button>
+          <button :disabled="submitting" type="submit">
+            {{ submitting ? '提交中' : '提交' }}
+          </button>
+        </div>
+
+        <section v-if="submitError" class="notice error">
+          {{ submitError }}
+          <template v-if="pickedFiles.length > 0">已上传成功的附件再次提交时不会重复上传。</template>
+        </section>
+        <section v-else-if="submitResult?.confirmed" class="notice success">
+          学校已确认收到提交{{ submitResult.submitTime ? `（${submitResult.submitTime}）` : '' }}{{ submitResult.attachmentCount ? `，附件 ${submitResult.attachmentCount} 个` : '' }}。
+        </section>
+        <section v-else-if="submitResult" class="notice warning">
+          提交请求已发出，但暂未在学校查到提交记录。请稍后刷新作业列表确认，必要时在企业微信云邮中核对。
+        </section>
+      </form>
     </template>
   </section>
 </template>

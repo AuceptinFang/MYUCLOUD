@@ -1044,8 +1044,6 @@ pre.assignment-content-box {
 .assignment-resources {
   display: grid;
   gap: 10px;
-  padding-top: 15px;
-  border-top: 1px solid var(--line);
 }
 
 .submit-actions {
@@ -1053,6 +1051,10 @@ pre.assignment-content-box {
   flex-wrap: wrap;
   gap: 10px;
   align-items: center;
+}
+
+.assignment-submit-actions button[type="submit"] {
+  margin-left: auto;
 }
 
 .file-picker {
