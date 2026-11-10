@@ -907,7 +907,7 @@ summary:focus-visible {
 .quiz-panel .survey-option:has(input:disabled) {
   cursor: default;
 }
-/* 交卷后的卷面：按每题得分标对错，自己选的选项和正确选项单独标出 */
+/* 交卷后的卷面：得分标签标对错，自己选的选项和正确选项单独标出 */
 .quiz-score {
   flex-shrink: 0;
   margin-left: auto;
@@ -930,18 +930,6 @@ summary:focus-visible {
 .quiz-score.wrong {
   background: var(--deadline-red-soft);
   color: var(--deadline-red);
-}
-.quiz-result .survey-question.correct {
-  padding-left: 14px;
-  box-shadow: inset 3px 0 0 var(--success-green);
-}
-.quiz-result .survey-question.partial {
-  padding-left: 14px;
-  box-shadow: inset 3px 0 0 var(--warning);
-}
-.quiz-result .survey-question.wrong {
-  padding-left: 14px;
-  box-shadow: inset 3px 0 0 var(--deadline-red);
 }
 .quiz-result .survey-option {
   align-items: center;
