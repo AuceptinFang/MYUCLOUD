@@ -559,7 +559,7 @@ POST https://apiucloud.bupt.edu.cn/ykt-activity/survey/submit-answer
 #### 测验列表
 
 ```http
-GET /ucloud/ykt-site/examination/list-stu?current=1&size=9999&status=-1&state=-1&statusSelf=未提交&siteId=<courseId>
+GET /ucloud/ykt-site/examination/list-stu?current=1&size=9999&status=-1&state=-1&siteId=<courseId>
 Blade-Auth: <access_token>
 Authorization: Basic c3dvcmQ6c3dvcmRfc2VjcmV0
 Tenant-Id: 000000
@@ -568,12 +568,12 @@ Tenant-Id: 000000
 远程路径：
 
 ```text
-GET https://apiucloud.bupt.edu.cn/ykt-site/examination/list-stu?current=1&size=9999&status=-1&state=-1&statusSelf=未提交&siteId=<courseId>
+GET https://apiucloud.bupt.edu.cn/ykt-site/examination/list-stu?current=1&size=9999&status=-1&state=-1&siteId=<courseId>
 ```
 
 `siteId` 必填，缺少时返回 400，所以只能按课程逐个查。`statusSelf` 可省略，省略时返回该课程全部测验，常见取值有 `未提交`、`已评分`。
 
-返回的测验数组在 `data.records`，常用字段：`id`、`title`、`startAt`、`endAt`、`statusSelf`、`score`（未评分为 `-1`）。记录里的 `siteId` 是 `-1`，课程要以查询时传的 `siteId` 为准。已经结束但没有提交的测验也会出现在 `statusSelf=未提交` 的结果里，页面按 `endAt` 过滤掉。
+返回的测验数组在 `data.records`，常用字段：`id`、`title`、`startAt`、`endAt`、`statusSelf`、`score`（未评分为 `-1`）。记录里的 `siteId` 是 `-1`，课程要以查询时传的 `siteId` 为准。本项目不带 `statusSelf`，拉取全部测验：未提交的列入待办（已经结束的按 `endAt` 过滤掉），已提交的算已完成，打开后查看卷面。
 
 #### 聚合待办（未使用）
 

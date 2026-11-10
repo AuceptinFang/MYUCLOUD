@@ -196,7 +196,7 @@ export function normalizeAssignment(record) {
 }
 
 // 问卷（type 2）和测验（type 4）和作业一起列入待办，都在应用内作答。
-// 列表只拉未提交的，所以都算未完成；id 加前缀，避免和作业撞号。
+// 问卷只拉未提交的；测验拉全部，已提交的算完成，可以打开看卷面。id 加前缀，避免和作业撞号。
 const ACTIVITY_LABELS = { survey: '问卷', quiz: '测验' }
 
 // 问卷和测验的时间带秒，作业列表只到分钟，显示时对齐
@@ -204,9 +204,9 @@ export function trimSeconds(value) {
   return String(value || '').replace(/(\d{2}:\d{2}):\d{2}$/, '$1')
 }
 
-function normalizeActivity(kind, record, { activityId, title, courseId, courseName, beginTime, deadline }) {
+function normalizeActivity(kind, record, { activityId, title, courseId, courseName, beginTime, deadline, isCompleted = false, scoreText = '' }) {
   const daysLeft = getDaysLeft(deadline)
-  const level = getDeadlineLevel(daysLeft, false)
+  const level = getDeadlineLevel(daysLeft, isCompleted)
 
   return {
     id: `${kind}-${activityId}`,
@@ -226,8 +226,9 @@ function normalizeActivity(kind, record, { activityId, title, courseId, courseNa
     isOverdue: level === 'overdue',
     isMissed: false,
     isLateSubmission: false,
-    isCompleted: false,
-    status: getAssignmentStatus(record, daysLeft, false),
+    isCompleted,
+    status: getAssignmentStatus(record, daysLeft, isCompleted),
+    scoreText,
     raw: record,
   }
 }
@@ -247,9 +248,15 @@ export function normalizeSurvey(record, courseName = '') {
   })
 }
 
-// 测验记录里的 siteId 是 -1，课程取自发起查询的那门课
+// 测验记录里的 siteId 是 -1，课程取自发起查询的那门课。statusSelf 实测有「未提交」「已评分」，
+// 不是「未提交」的都算已提交；score 未评分时是 -1
 export function normalizeQuiz(record, { courseId = '', courseName = '' } = {}) {
+  const isCompleted = Boolean(record.statusSelf) && record.statusSelf !== '未提交'
+  const score = Number(record.score)
+
   return normalizeActivity('quiz', record, {
+    isCompleted,
+    scoreText: isCompleted ? (score >= 0 ? `${score} 分` : record.statusSelf) : '',
     activityId: record.id,
     title: record.title,
     courseId,

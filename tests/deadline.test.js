@@ -95,6 +95,18 @@ test('问卷和测验归一成待办条目，id 加前缀，课程取自课程�
   assert.equal(quiz.id, 'quiz-2115665119386898433')
   assert.equal(quiz.courseId, 'c1')
   assert.equal(quiz.isOverdue, true)
+  assert.equal(quiz.isCompleted, false)
+
+  // 已提交的测验算完成，带上分数；截止后也不算逾期
+  const graded = normalizeQuiz(
+    { id: '2111661340378087426', title: 'Unit 4', statusSelf: '已评分', score: 100.0, startAt: daysFromNow(-20), endAt: daysFromNow(-1) },
+    { courseId: 'c2', courseName: '云计算技术' },
+  )
+  assert.equal(graded.isCompleted, true)
+  assert.equal(graded.isOverdue, false)
+  assert.equal(graded.level, 'submitted')
+  assert.equal(graded.scoreText, '100 分')
+  assert.equal(normalizeQuiz({ id: '3', statusSelf: '已提交', score: -1 }).scoreText, '已提交')
 })
 
 test('问卷和测验的时间去掉秒，和作业列表一致', () => {

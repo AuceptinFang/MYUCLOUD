@@ -18,7 +18,7 @@ import {
   getResourcesById,
   getStudentCourses,
   getTodoSurveys,
-  getUnsubmittedQuizzes,
+  getQuizzes,
   getUserInfo,
   loginWithCredentials,
   pickToken,
@@ -769,7 +769,7 @@ async function loadActivityTasks(userId, courseRecords) {
     if (!courseId) return []
 
     try {
-      const quizCall = await getUnsubmittedQuizzes(bladeToken.value, courseId)
+      const quizCall = await getQuizzes(bladeToken.value, courseId)
       log('study:quizzes:start', quizCall.request)
       log('study:quizzes:response', quizCall.result)
       checkAuth(quizCall.result, '测验列表')
@@ -785,7 +785,7 @@ async function loadActivityTasks(userId, courseRecords) {
 
   const tasks = (await Promise.all([...surveyCalls, ...quizCalls])).flat()
 
-  // 截止后问卷和测验都没法再作答，不再列出
+  // 截止后还没交的问卷和测验没法再作答，不再列出；已交的测验保留，可以看卷面
   return tasks.filter((task) => !task.isOverdue)
 }
 
@@ -1122,10 +1122,12 @@ function openQuiz(quiz) {
 
 function handleQuizSubmitted(quizId) {
   log('study:quiz-submitted', { quizId })
-  activityTasks.value = activityTasks.value.filter((task) => !(task.kind === 'quiz' && task.activityId === quizId))
-  if (selectedQuiz.value?.activityId === quizId) {
-    selectedQuiz.value = { ...selectedQuiz.value, isCompleted: true, level: 'submitted', status: '已提交' }
-  }
+  // 交卷后留在列表的「已完成」里，方便回来看卷面；分数等下次刷新待办时更新
+  const markSubmitted = (task) => ({ ...task, isCompleted: true, level: 'submitted', status: '已提交', isUrgent: false, isOverdue: false })
+  activityTasks.value = activityTasks.value.map((task) =>
+    task.kind === 'quiz' && task.activityId === quizId ? markSubmitted(task) : task,
+  )
+  if (selectedQuiz.value?.activityId === quizId) selectedQuiz.value = markSubmitted(selectedQuiz.value)
 }
 
 function openAssignment(assignment) {

@@ -243,14 +243,13 @@ export async function submitSurveyAnswers(token, answers) {
   }
 }
 
-// 测验列表必须带 siteId，只能按课程逐个查；statusSelf 只滤未提交，已经结束的也会返回
-export async function getUnsubmittedQuizzes(token, siteId) {
+// 测验列表必须带 siteId，只能按课程逐个查；不带 statusSelf 时返回全部，记录里的 statusSelf 区分是否已提交
+export async function getQuizzes(token, siteId) {
   const params = new URLSearchParams({
     current: '1',
     size: '9999',
     status: '-1',
     state: '-1',
-    statusSelf: '未提交',
     siteId,
   })
   const request = {

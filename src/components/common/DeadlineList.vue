@@ -134,6 +134,7 @@ const assignmentGroups = computed(() => groupAssignments(props.assignments))
             <span class="feed-assignment-meta">
               {{ assignment.courseName || '未标注课程' }}
               <span v-if="assignment.chapter">· {{ assignment.chapter }}</span>
+              <span v-if="assignment.scoreText">· {{ assignment.scoreText }}</span>
             </span>
             <span class="feed-assignment-date">
               <template v-if="assignment.kind === 'quiz' && assignment.beginTime">{{ assignment.beginTime }} 开始，</template>
