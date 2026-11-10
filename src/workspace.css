@@ -364,9 +364,6 @@ summary:focus-visible {
   line-height: 1.6;
   overflow-wrap: anywhere;
 }
-a.feed-assignment {
-  text-decoration: none;
-}
 .feed-kind {
   display: inline-block;
   margin-right: 6px;
@@ -830,4 +827,83 @@ a.feed-assignment {
 .survey-draft-hint {
   color: var(--muted);
   font-size: 12px;
+}
+/* 测验作答，题目沿用问卷样式 */
+.quiz-intro {
+  display: grid;
+  gap: 16px;
+}
+.quiz-facts {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+}
+.quiz-facts div {
+  display: flex;
+  gap: 12px;
+}
+.quiz-facts dt {
+  width: 64px;
+  flex-shrink: 0;
+  color: var(--muted);
+}
+.quiz-facts dd {
+  margin: 0;
+  color: var(--ink);
+}
+.quiz-bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: white;
+  font-size: 13px;
+}
+.quiz-bar strong {
+  font-variant-numeric: tabular-nums;
+}
+.quiz-bar span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.quiz-bar.urgent strong {
+  color: var(--deadline-red);
+}
+.quiz-save-state {
+  flex-shrink: 0;
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+.quiz-save-state.error {
+  color: var(--deadline-red);
+}
+.quiz-option-letter {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+.quiz-blanks {
+  display: grid;
+  gap: 8px;
+}
+.quiz-blank-label {
+  justify-self: start !important;
+}
+.quiz-panel .survey-question-trunk > :is(p, div) {
+  margin: 0;
+}
+.quiz-panel .survey-question-trunk > :is(p, div):empty {
+  display: none;
+}
+.quiz-panel .survey-option:has(input:disabled) {
+  cursor: default;
 }

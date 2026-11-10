@@ -32,12 +32,13 @@ const navigationItems = computed(() => [
   ...(props.debugEnabled ? [{ view: 'debug', name: '调试' }] : []),
 ])
 const activeNavigation = computed(() =>
-  ['course', 'assignment', 'survey'].includes(props.activeView) ? 'study' : props.activeView,
+  ['course', 'assignment', 'survey', 'quiz'].includes(props.activeView) ? 'study' : props.activeView,
 )
 const pageTitle = computed(() => {
   if (props.activeView === 'course') return '课程详情'
   if (props.activeView === 'assignment') return '作业详情'
   if (props.activeView === 'survey') return '问卷'
+  if (props.activeView === 'quiz') return '测验'
   return navigationItems.value.find((item) => item.view === props.activeView)?.name || '学习服务'
 })
 

@@ -33,6 +33,7 @@ import CourseGrid from './components/common/CourseGrid.vue'
 import CourseResourcePanel from './components/common/CourseResourcePanel.vue'
 import DeadlineList from './components/common/DeadlineList.vue'
 import SurveyPanel from './components/common/SurveyPanel.vue'
+import QuizPanel from './components/common/QuizPanel.vue'
 import AppShell from './components/layout/AppShell.vue'
 import { usePlugins } from './plugin/index.js'
 import {
@@ -58,6 +59,7 @@ const activeView = ref(getViewFromHash())
 const routeCourseId = ref(getRouteCourseId())
 const routeAssignmentId = ref(getRouteAssignmentId())
 const routeSurveyId = ref(getRouteSurveyId())
+const routeQuizId = ref(getRouteQuizId())
 const plugins = usePlugins()
 const pluginViews = computed(() => new Set(plugins.map((p) => p.view)))
 const username = ref('')
@@ -99,6 +101,9 @@ const activityTasks = ref([])
 // 当前作答的问卷；提交后会从待办移除，这里保留标题等信息给页头用
 const selectedSurvey = ref(null)
 const surveyTitle = ref('')
+// 当前作答的测验，交卷后从待办移除
+const selectedQuiz = ref(null)
+const quizTitle = ref('')
 const includeCompleted = ref(false)
 const assignmentPageSize = ref(20)
 const lastLoadedAt = ref('')
@@ -185,6 +190,7 @@ function getViewFromHash() {
   if (hash.startsWith('#course/')) return 'course'
   if (hash.startsWith('#assignment/')) return 'assignment'
   if (hash.startsWith('#survey/')) return 'survey'
+  if (hash.startsWith('#quiz/')) return 'quiz'
   if (hash.startsWith('#') && hash.length > 1) return hash.slice(1)
 
   return 'study'
@@ -206,6 +212,12 @@ function getRouteSurveyId() {
   if (!window.location.hash.startsWith('#survey/')) return ''
 
   return decodeURIComponent(window.location.hash.slice('#survey/'.length))
+}
+
+function getRouteQuizId() {
+  if (!window.location.hash.startsWith('#quiz/')) return ''
+
+  return decodeURIComponent(window.location.hash.slice('#quiz/'.length))
 }
 
 function setCourseHash(courseId) {
@@ -295,13 +307,24 @@ function resetAssignmentDetail() {
 }
 
 function syncViewFromHash() {
+  const previousSurveyId = routeSurveyId.value
+  const previousQuizId = routeQuizId.value
   activeView.value = getViewFromHash()
   routeCourseId.value = getRouteCourseId()
   routeAssignmentId.value = getRouteAssignmentId()
   routeSurveyId.value = getRouteSurveyId()
+  routeQuizId.value = getRouteQuizId()
+
+  // 加载完待办后也会走到这里；编号没变时保留已读到的标题（不在待办里的测验 selectedQuiz 一直为空）
+  if (activeView.value === 'quiz' && selectedQuiz.value?.activityId !== routeQuizId.value) {
+    if (previousQuizId !== routeQuizId.value) quizTitle.value = ''
+    selectedQuiz.value =
+      activityTasks.value.find((task) => task.kind === 'quiz' && task.activityId === routeQuizId.value) || null
+    return
+  }
 
   if (activeView.value === 'survey' && selectedSurvey.value?.activityId !== routeSurveyId.value) {
-    surveyTitle.value = ''
+    if (previousSurveyId !== routeSurveyId.value) surveyTitle.value = ''
     selectedSurvey.value =
       activityTasks.value.find((task) => task.kind === 'survey' && task.activityId === routeSurveyId.value) || null
     return
@@ -1063,6 +1086,10 @@ function openTodoItem(item) {
     openSurvey(item)
     return
   }
+  if (item.kind === 'quiz') {
+    openQuiz(item)
+    return
+  }
 
   openAssignment(item)
 }
@@ -1082,6 +1109,22 @@ function handleSurveySubmitted(surveyId) {
   )
   if (selectedSurvey.value?.activityId === surveyId) {
     selectedSurvey.value = { ...selectedSurvey.value, isCompleted: true, level: 'submitted', status: '已提交' }
+  }
+}
+
+function openQuiz(quiz) {
+  selectedQuiz.value = quiz
+  quizTitle.value = ''
+  activeView.value = 'quiz'
+  routeQuizId.value = quiz.activityId
+  window.location.hash = `#quiz/${encodeURIComponent(quiz.activityId)}`
+}
+
+function handleQuizSubmitted(quizId) {
+  log('study:quiz-submitted', { quizId })
+  activityTasks.value = activityTasks.value.filter((task) => !(task.kind === 'quiz' && task.activityId === quizId))
+  if (selectedQuiz.value?.activityId === quizId) {
+    selectedQuiz.value = { ...selectedQuiz.value, isCompleted: true, level: 'submitted', status: '已提交' }
   }
 }
 
@@ -1332,6 +1375,8 @@ function clearToken() {
   activityTasks.value = []
   selectedSurvey.value = null
   surveyTitle.value = ''
+  selectedQuiz.value = null
+  quizTitle.value = ''
   resetCourseResources()
   resetCourseAssignments()
   resetAssignmentDetail()
@@ -1585,6 +1630,35 @@ onUnmounted(() => {
         @expired="handleTokenExpiry('survey')"
         @loaded="surveyTitle = $event.theme || ''"
         @submitted="handleSurveySubmitted"
+      />
+    </template>
+
+    <template v-else-if="activeView === 'quiz'">
+      <section class="detail-context">
+        <button class="detail-back" type="button" @click="setView('study')">
+          <span aria-hidden="true">←</span>
+          首页
+        </button>
+        <div class="detail-context-copy">
+          <span class="context-eyebrow">QUIZ</span>
+          <h1>{{ selectedQuiz?.title || quizTitle || '测验' }}</h1>
+          <p>{{ selectedQuiz?.courseName || '课程测验' }}</p>
+        </div>
+        <div class="detail-context-side">
+          <AssignmentStatus
+            v-if="selectedQuiz"
+            :level="selectedQuiz.level"
+            :status="selectedQuiz.status"
+          />
+        </div>
+      </section>
+      <QuizPanel
+        :quiz-id="routeQuizId"
+        :token="bladeToken"
+        :user-id="String(userInfo?.id || '')"
+        @expired="handleTokenExpiry('quiz')"
+        @loaded="quizTitle = $event.title || ''"
+        @submitted="handleQuizSubmitted"
       />
     </template>
 

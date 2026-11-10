@@ -1,7 +1,6 @@
 <script setup>
 import { computed } from 'vue'
 import AssignmentStatus from './AssignmentStatus.vue'
-import { buildActivityUrl } from '../../api/ucloud.js'
 import { groupAssignments, formatRelativeDeadline } from '../../utils/assignment-display.js'
 
 const props = defineProps({
@@ -69,27 +68,6 @@ const pageSizeOptions = computed(() =>
 
 const assignmentGroups = computed(() => groupAssignments(props.assignments))
 
-// 测验还不能在本应用里作答，直接链到官方页面；作业和问卷在应用内打开
-function isExternal(assignment) {
-  return assignment.kind === 'quiz'
-}
-
-function itemAttrs(assignment) {
-  if (isExternal(assignment)) {
-    return {
-      href: buildActivityUrl(assignment),
-      target: '_blank',
-      rel: 'noopener noreferrer',
-      title: `在 UCloud 打开${assignment.kindLabel}`,
-    }
-  }
-
-  return { type: 'button', disabled: assignment.id === props.loadingAssignmentId }
-}
-
-function selectItem(assignment) {
-  if (!isExternal(assignment)) emit('select', assignment)
-}
 </script>
 
 <template>
@@ -139,14 +117,14 @@ function selectItem(assignment) {
           <small>{{ group.hint }}</small>
           <span>{{ group.assignments.length }}</span>
         </h3>
-        <component
-          :is="isExternal(assignment) ? 'a' : 'button'"
+        <button
           v-for="assignment in group.assignments"
           :key="assignment.id"
           class="feed-assignment"
           :class="{ selected: assignment.id === selectedAssignmentId }"
-          v-bind="itemAttrs(assignment)"
-          @click="selectItem(assignment)"
+          :disabled="assignment.id === loadingAssignmentId"
+          type="button"
+          @click="emit('select', assignment)"
         >
           <span class="feed-assignment-copy">
             <span class="feed-assignment-title">
@@ -156,7 +134,6 @@ function selectItem(assignment) {
             <span class="feed-assignment-meta">
               {{ assignment.courseName || '未标注课程' }}
               <span v-if="assignment.chapter">· {{ assignment.chapter }}</span>
-              <span v-if="isExternal(assignment)">· 去 UCloud 作答&nbsp;↗</span>
             </span>
             <span class="feed-assignment-date">
               <template v-if="assignment.kind === 'quiz' && assignment.beginTime">{{ assignment.beginTime }} 开始，</template>
@@ -173,7 +150,7 @@ function selectItem(assignment) {
               }}
             </span>
           </span>
-        </component>
+        </button>
       </section>
     </div>
   </section>

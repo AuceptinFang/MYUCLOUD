@@ -195,7 +195,7 @@ export function normalizeAssignment(record) {
   }
 }
 
-// 问卷（type 2）和测验（type 4）和作业一起列入待办；问卷在应用内作答，测验跳转官方页面。
+// 问卷（type 2）和测验（type 4）和作业一起列入待办，都在应用内作答。
 // 列表只拉未提交的，所以都算未完成；id 加前缀，避免和作业撞号。
 const ACTIVITY_LABELS = { survey: '问卷', quiz: '测验' }
 

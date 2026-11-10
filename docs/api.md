@@ -594,23 +594,35 @@ GET https://apiucloud.bupt.edu.cn/ykt-site/site/student/undone?userId=<userId>
 
 实测记录里没有课程信息：`siteId` 一律是 `-1`，`siteName` 只有问卷带课程名，作业为空字符串。作业已经由作业列表覆盖，问卷和测验分别用待填问卷、测验列表两个接口能拿到课程，所以本项目没有使用它。
 
-#### 测验作答（未接入）
+#### 测验作答
 
-以下接口取自官方答题页（`course.html#/answer`）的代码，没有用真实测验验证过：
+接口取自官方答题页（`course.html#/answer`）的代码，2026-11-10 用可重复作答的真实测验（单选、多选、判断）走通了进入、逐题保存、交卷和查看成绩：
 
 | 步骤 | 接口 | 说明 |
 | --- | --- | --- |
-| 进入试卷 | `POST /ykt-site/answersheet/enter-paper?examinationId=<测验 id>` | 返回 `data.paperParts[].paperTrees[]`，题目在 `questionCombinationDTO`，`examTime` 为分钟；进入后开始计时 |
-| 保存单题 | `POST /ykt-site/answersheet/member-answers` | `{ examinationId, answerSheetList: [{ questiontId, values, resourceIds }] }`，每题单独保存 |
-| 检查漏答 | `GET /ykt-site/answersheet/query-no-submit?examinationId=<测验 id>` | 交卷前提示未作答的题 |
-| 交卷 | `POST /ykt-site/answersheet/submit-exam?examinationId=<测验 id>&auto=false` | 超时自动交卷时 `auto=true` |
-| 查看已评卷面 | `GET /ykt-site/answersheet/have-read-paper-stu?...` | 已评分测验的卷面与得分 |
+| 测验概要 | `GET /ykt-site/examination/exam-info-stu?id=<测验 id>` | `duration`（分钟）、`isAllowRepet`、`submit`、`score`、`startAt`、`endAt`；不会开始计时 |
+| 服务器时间 | `GET /ykt-site/common/clock` | `data.data` 为北京时间（如 `2026-11-10T16:26:30.112`），实测比本机快 5–7 秒且多次请求间有几秒抖动 |
+| 进入试卷 | `POST /ykt-site/answersheet/enter-paper?examinationId=<测验 id>` | 返回 `examTime`（分钟）、`startAt`、`endAt` 和 `paperParts[].paperTrees[]`；题目在 `questionCombinationDTO`，`selfAnswer` 是已保存的答案，`rightAnswer` 一律为 `-1` |
+| 保存单题 | `POST /ykt-site/answersheet/member-answers` | `{ examinationId, answerSheetList: [{ questiontId, values, resourceIds }] }`，每题单独保存，后一次覆盖前一次 |
+| 检查漏答 | `GET /ykt-site/answersheet/query-no-submit?examinationId=<测验 id>` | 返回未保存答案的 `questionId` 列表 |
+| 交卷 | `POST /ykt-site/answersheet/submit-exam?examinationId=<测验 id>&auto=false` | 超时自动交卷时 `auto=true`；客观题交卷后立即评分 |
+| 查看卷面 | `GET /ykt-site/answersheet/have-read-paper-stu?examinationId=<测验 id>` | 结构同进入试卷，另有 `score`、`totalPoints` 和每题 `score` |
 
-题型 `questionType`：`1` 单选、`2`/`3` 多选、`4` 填空、`5` 判断、`6` 主观（可附文件，附件以 `bizType: 8` 上传）。注意参数名是 `questiontId`，官方代码里就多一个 `t`。
+计时：第一次进入时 `startAt` 记为当前时间，作答中再次进入不会重新计时。已提交且允许重复作答的测验，进入即开始新的一次作答，`selfAnswer` 带上一次的答案。官方页面的剩余时间取 `startAt + examTime` 与 `endAt` 中较早者减去服务器时间。
+
+`values` 的格式按题型 `questionType`：
+
+| 题型 | `values` | 验证情况 |
+| --- | --- | --- |
+| `1` 单选、`2`/`3` 多选、`5` 判断 | 选中选项的 `id` 数组（判断题也有"正确/错误"两个选项） | 已验证 |
+| `4` 填空 | 每空一段文本，按 `questionOptionsList`（为空时按 `questionAnswersList`）的条数 | 仅取自官方代码 |
+| `6` 主观 | `[文本]`，附件先以 `bizType: 8` 上传，id 放进 `resourceIds` | 仅取自官方代码；本应用不支持附件 |
+
+组合题的小题在 `paperTreeChilds`，每个小题单独保存，题干用大题的。官方页面不保存空答案。注意参数名是 `questiontId`，官方代码里就多一个 `t`。`values` 必须是数组，传字符串会返回 400。
 
 #### 官方作答页面
 
-测验在本项目里只做提醒，点开后跳转到官方页面作答。地址与官方首页待办的跳转一致（问卷已在应用内作答，官方地址仅在遇到不支持的题型时使用）：
+问卷和测验都在应用内作答，官方地址只在遇到不支持的题型或需要上传附件时使用。地址与官方首页待办的跳转一致：
 
 | 类型 | 地址 |
 | --- | --- |
