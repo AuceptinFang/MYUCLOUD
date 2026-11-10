@@ -23,6 +23,7 @@ import {
   parseQuizTime,
   quizAnswerValues,
   quizDeadline,
+  quizQuestionResult,
 } from '../../utils/quiz.js'
 import { trimSeconds } from '../../utils/deadline.js'
 
@@ -90,7 +91,7 @@ const subtitle = computed(() => {
   if (!info.value) return error.value ? '读取失败' : '正在读取测验'
   return [
     info.value.duration ? `限时 ${info.value.duration} 分钟` : '',
-    info.value.isAllowRepet ? '可重复作答' : '只能提交一次',
+    info.value.isAllowRepet ? '允许重复提交' : '不允许重复提交',
     info.value.endAt ? `截止 ${trimSeconds(info.value.endAt)}` : '',
   ]
     .filter(Boolean)
@@ -368,7 +369,7 @@ onBeforeUnmount(() => {
       <dl class="quiz-facts">
         <div><dt>开放时间</dt><dd>{{ trimSeconds(info.startAt) }} — {{ trimSeconds(info.endAt) }}</dd></div>
         <div><dt>限时</dt><dd>{{ info.duration ? `${info.duration} 分钟` : '不限' }}</dd></div>
-        <div><dt>提交次数</dt><dd>{{ info.isAllowRepet ? '可重复作答' : '只能提交一次' }}</dd></div>
+        <div><dt>重复提交</dt><dd>{{ info.isAllowRepet ? '允许' : '不允许，交卷后不能再进入作答' }}</dd></div>
       </dl>
       <section v-if="!isOpen" class="notice">测验不在开放时间内。</section>
       <div v-else-if="confirmingStart" class="submit-actions survey-confirm">
@@ -382,7 +383,12 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <form v-if="phase === 'answering' || phase === 'result'" class="survey-form" @submit.prevent="requestSubmit">
+    <form
+      v-if="phase === 'answering' || phase === 'result'"
+      class="survey-form"
+      :class="{ 'quiz-result': phase === 'result' }"
+      @submit.prevent="requestSubmit"
+    >
       <div v-if="phase === 'answering'" class="quiz-bar" :class="{ urgent: remaining !== null && remaining < 5 * 60000 }">
         <strong>{{ remaining === null ? '不限时' : `剩余 ${formatCountdown(remaining)}` }}</strong>
         <span>答案逐题保存到 UCloud，离开页面不会暂停计时</span>
@@ -398,6 +404,7 @@ onBeforeUnmount(() => {
           v-for="question in phase === 'answering' ? questions : resultQuestions"
           :key="question.id"
           class="survey-question"
+          :class="phase === 'result' ? quizQuestionResult(question) : ''"
         >
           <div class="survey-question-title">
             <span class="survey-question-index">{{ question.label }}.</span>
@@ -405,11 +412,19 @@ onBeforeUnmount(() => {
             <div v-if="isHtml(question.stem)" class="survey-question-trunk" v-html="question.stem" />
             <div v-else class="survey-question-trunk">{{ question.stem }}</div>
             <span v-if="phase === 'answering'" class="quiz-save-state" :class="saveStates[question.id]">{{ saveStateText(question) }}</span>
-            <span v-else class="quiz-save-state">{{ question.score }}/{{ question.points }}</span>
+            <span v-else class="quiz-score" :class="quizQuestionResult(question)">
+              {{ { correct: '正确', partial: '部分正确', wrong: '错误' }[quizQuestionResult(question)] || '' }}
+              {{ Number(question.score) >= 0 ? question.score : '-' }}/{{ question.points }}
+            </span>
           </div>
 
           <div v-if="isChoiceQuestion(question)" class="survey-options">
-            <label v-for="(option, index) in question.options" :key="option.id" class="survey-option">
+            <label
+              v-for="(option, index) in question.options"
+              :key="option.id"
+              class="survey-option"
+              :class="phase === 'result' && { picked: isSelected(question.initialAnswer, option.id), right: option.isRight }"
+            >
               <input
                 v-if="isMultipleChoice(question)"
                 :checked="isSelected(phase === 'answering' ? answers[question.id] : question.initialAnswer, option.id)"
@@ -428,6 +443,8 @@ onBeforeUnmount(() => {
               <span class="quiz-option-letter">{{ LETTERS[index] }}.</span>
               <span v-if="isHtml(option.content)" class="survey-question-trunk" v-html="option.content" />
               <span v-else>{{ option.content }}</span>
+              <span v-if="phase === 'result' && isSelected(question.initialAnswer, option.id)" class="quiz-option-tag">你的答案</span>
+              <span v-if="phase === 'result' && option.isRight" class="quiz-option-tag right">正确答案</span>
             </label>
           </div>
 
@@ -457,6 +474,12 @@ onBeforeUnmount(() => {
             <textarea v-else :value="question.initialAnswer[0] || ''" disabled />
             <span v-if="phase === 'answering'">需要上传附件的话请到 UCloud 作答</span>
           </label>
+
+          <div v-if="phase === 'result' && question.analysis" class="quiz-analysis">
+            <strong>解析</strong>
+            <div v-if="isHtml(question.analysis)" v-html="question.analysis" />
+            <div v-else>{{ question.analysis }}</div>
+          </div>
         </li>
       </ol>
 
@@ -465,7 +488,7 @@ onBeforeUnmount(() => {
       <template v-if="phase === 'answering'">
         <div v-if="confirmingSubmit" class="submit-actions survey-confirm">
           <span v-if="confirmingSubmit.labels.length">第 {{ confirmingSubmit.labels.join('、') }} 题没有保存答案，仍要交卷？</span>
-          <span v-else>{{ info?.isAllowRepet ? '确认交卷？' : '只能提交一次，交卷后不能修改。确认交卷？' }}</span>
+          <span v-else>{{ info?.isAllowRepet ? '确认交卷？' : '本测验不允许重复提交，交卷后不能再进入作答。确认交卷？' }}</span>
           <button :disabled="submitting" type="button" @click="submit(false)">{{ submitting ? '交卷中' : '交卷' }}</button>
           <button class="button-secondary" :disabled="submitting" type="button" @click="confirmingSubmit = null">继续答题</button>
         </div>

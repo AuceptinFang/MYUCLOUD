@@ -8,6 +8,7 @@ import {
   parseQuizTime,
   quizAnswerValues,
   quizDeadline,
+  quizQuestionResult,
 } from '../src/utils/quiz.js'
 
 // 结构取自真实测验 enter-paper 的返回（2026-11-10），只保留用到的字段
@@ -78,4 +79,18 @@ test('截止取进入时间加时长和结束时间中较早的，按北京时�
   assert.equal(formatCountdown(65_400), '01:06')
   assert.equal(formatCountdown(3_725_000), '1:02:05')
   assert.equal(formatCountdown(-5), '00:00')
+})
+
+test('按得分判断对错，未评分不标；rightAnswer 为 1 的是正确选项', () => {
+  const base = { points: '10.0' }
+  assert.equal(quizQuestionResult({ ...base, score: '10.0' }), 'correct')
+  assert.equal(quizQuestionResult({ ...base, score: '5.0' }), 'partial')
+  assert.equal(quizQuestionResult({ ...base, score: '0.0' }), 'wrong')
+  assert.equal(quizQuestionResult({ ...base, score: -1 }), '')
+  assert.equal(quizQuestionResult({ ...base, score: '' }), '')
+  const [question] = flattenQuizPaper({ paperParts: [{ paperTrees: [{
+    ...tree(1, 1, []),
+    questionCombinationDTO: { questionType: 1, stem: '', questionOptionsList: [{ id: 'a', rightAnswer: -1 }, { id: 'b', rightAnswer: 1 }] },
+  }] }] })
+  assert.deepEqual(question.options.map((option) => option.isRight), [false, true])
 })

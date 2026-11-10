@@ -907,3 +907,99 @@ summary:focus-visible {
 .quiz-panel .survey-option:has(input:disabled) {
   cursor: default;
 }
+/* 交卷后的卷面：按每题得分标对错，自己选的选项和正确选项单独标出 */
+.quiz-score {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #f1f3f6;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.quiz-score.correct {
+  background: var(--success-soft);
+  color: var(--success-green);
+}
+.quiz-score.partial {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.quiz-score.wrong {
+  background: var(--deadline-red-soft);
+  color: var(--deadline-red);
+}
+.quiz-result .survey-question.correct {
+  padding-left: 14px;
+  box-shadow: inset 3px 0 0 var(--success-green);
+}
+.quiz-result .survey-question.partial {
+  padding-left: 14px;
+  box-shadow: inset 3px 0 0 var(--warning);
+}
+.quiz-result .survey-question.wrong {
+  padding-left: 14px;
+  box-shadow: inset 3px 0 0 var(--deadline-red);
+}
+.quiz-result .survey-option {
+  align-items: center;
+}
+.quiz-result .survey-option:has(input:checked) {
+  border-color: var(--line);
+  background: white;
+}
+.quiz-result .survey-option.picked {
+  border-width: 2px;
+  border-color: var(--primary);
+  background: var(--cloud-blue-soft);
+  font-weight: 600;
+}
+.quiz-result .correct .survey-option.picked {
+  border-color: var(--success-green);
+  background: var(--success-soft);
+}
+.quiz-result :is(.partial, .wrong) .survey-option.picked:not(.right) {
+  border-color: var(--deadline-red);
+  background: var(--deadline-red-soft);
+}
+.quiz-result .survey-option.right:not(.picked) {
+  border: 2px dashed var(--success-green);
+}
+.quiz-option-tag {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+}
+.quiz-result .correct .quiz-option-tag {
+  background: var(--success-green);
+}
+.quiz-result :is(.partial, .wrong) .picked:not(.right) .quiz-option-tag {
+  background: var(--deadline-red);
+}
+.quiz-option-tag.right {
+  background: var(--success-green);
+}
+.quiz-option-tag + .quiz-option-tag {
+  margin-left: 6px;
+}
+.quiz-analysis {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: var(--radius-control);
+  background: #f8fafc;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.quiz-analysis strong {
+  color: var(--muted);
+  font-size: 12px;
+}

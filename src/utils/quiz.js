@@ -17,7 +17,12 @@ export function isChoiceQuestion(question) {
 function toQuestion(tree, { stem, label, part }) {
   const dto = tree.questionCombinationDTO || {}
   const type = Number(dto.questionType)
-  const options = (dto.questionOptionsList || []).map((option) => ({ id: String(option.id), content: option.optionContent || '' }))
+  // rightAnswer 为 1 是正确选项；老师没开「答案与解析反馈」时一律是 -1
+  const options = (dto.questionOptionsList || []).map((option) => ({
+    id: String(option.id),
+    content: option.optionContent || '',
+    isRight: Number(option.rightAnswer) === 1,
+  }))
   const selfAnswer = (tree.selfAnswer || []).map(String)
 
   return {
@@ -32,6 +37,7 @@ function toQuestion(tree, { stem, label, part }) {
     points: tree.points ?? '',
     score: tree.score ?? '',
     initialAnswer: selfAnswer,
+    analysis: dto.analysis || '',
   }
 }
 
@@ -51,6 +57,15 @@ export function flattenQuizPaper(paper) {
     }
   }
   return questions
+}
+
+// 按得分判断对错：满分 correct，部分得分 partial，零分 wrong；未评分（-1 或空）返回空串
+export function quizQuestionResult(question) {
+  const score = Number(question.score)
+  const points = Number(question.points)
+  if (question.score === '' || !Number.isFinite(score) || score < 0 || !(points > 0)) return ''
+  if (score >= points) return 'correct'
+  return score > 0 ? 'partial' : 'wrong'
 }
 
 // 选择题保持数组（单选也是），填空题每空一个字符串，主观题一个字符串
