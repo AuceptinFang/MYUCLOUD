@@ -89,7 +89,8 @@ function isTruthyFlag(value) {
 // 学校字段的真实含义（以真实账号数据核对过）：
 // - status：作业本身的状态，2 进行中、3 已截止，与是否提交无关；
 // - assignmentStatus：本人的提交状态，99 未提交，0 已提交、1 已批改；
-// - isOverTime：1 表示是截止后补交的；isOvertimeCommit（详情、submit-view）：1 表示允许补交。
+// - isOverTime：1 表示是截止后补交的。
+// （isOvertimeCommit 是学校标注的"是否允许补交"，但后端提交接口并不校验它，前端也不再据此拦截。）
 export const NOT_SUBMITTED_STATUS = 99
 
 /** 按 assignmentStatus 判断是否已提交；字段缺失或无法识别时返回 null，交给其他字段判断。 */
@@ -121,16 +122,6 @@ export function isRecordCompleted(record) {
     isTruthyFlag(record.isSubmitted) ||
     isTruthyFlag(record.isCommit)
   )
-}
-
-/** 是否允许截止后补交；学校没给这个字段时返回 null。 */
-export function allowsLateSubmission(body) {
-  const data = body?.data ?? body
-  if (!data || typeof data !== 'object' || data.isOvertimeCommit === undefined || data.isOvertimeCommit === null) {
-    return null
-  }
-
-  return Number(data.isOvertimeCommit) === 1
 }
 
 function hasText(value) {

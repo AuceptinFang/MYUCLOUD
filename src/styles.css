@@ -2246,8 +2246,3 @@ pre.assignment-content-box {
   background: var(--success-green);
   transition: width 0.2s ease;
 }
-
-.notice.submission-closed {
-  display: grid;
-  gap: 4px;
-}

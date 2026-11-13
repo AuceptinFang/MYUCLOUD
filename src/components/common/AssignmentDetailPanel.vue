@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue'
 import VideoPreview from './VideoPreview.vue'
 import { fetchBackend, friendlyError, responseErrorMessage } from '../../api/http.js'
 import { assertUcloudOk } from '../../api/ucloud.js'
-import { allowsLateSubmission, parseBeijingTime } from '../../utils/deadline.js'
+import { parseBeijingTime } from '../../utils/deadline.js'
 import { BUSINESS_AUTH, TENANT_ID, TOKEN_KEY, buildPreviewUrl, buildFileUrl, isVideoResource, getResourcePreviewUrl, pickPreviewData } from '../../api/ucloud'
 
 const props = defineProps({
@@ -423,13 +423,11 @@ function clearPickedFiles() {
   }
 }
 
-// 截止后能否提交只看学校的 isOvertimeCommit；submit-view 与详情都会带，未知时不拦，只提示
+// 学校后端不校验 isOvertimeCommit，截止后照样接受提交，所以前端不再拦，截止后只提示会记为补交
 const isPastDeadline = computed(() => {
   const deadline = parseBeijingTime(getAssignmentDeadline(props.assignment, props.detail))
   return deadline !== null && deadline < Date.now()
 })
-const lateSubmissionAllowed = computed(() => allowsLateSubmission(props.submitView) ?? allowsLateSubmission(props.detail))
-const submissionClosed = computed(() => isPastDeadline.value && lateSubmissionAllowed.value === false)
 
 const LARGE_UPLOAD_BYTES = 20 * 1024 * 1024
 
@@ -595,13 +593,7 @@ function submitAssignment() {
         {{ getAssignmentComment(assignment, detail, submitView) }}
       </div>
 
-      <section v-if="submissionClosed" class="notice warning submission-closed">
-        <strong>已截止，不能再提交</strong>
-        <span>{{ assignment.isCompleted ? '截止时间已过，学校不允许修改已提交的内容。' : '截止时间已过，教师没有开放补交。如需补交请联系老师。' }}</span>
-      </section>
-
       <form
-        v-else
         class="assignment-submit-box"
         :class="{ 'drag-active': dragActive }"
         @submit.prevent="submitAssignment"
@@ -613,8 +605,7 @@ function submitAssignment() {
         <div class="subsection-header">
           <div>
             <strong>{{ isPastDeadline ? '补交作业' : '提交作业' }}</strong>
-            <span v-if="isPastDeadline && lateSubmissionAllowed">已过截止时间，教师允许补交，提交后会记为补交</span>
-            <span v-else-if="isPastDeadline">已过截止时间，未能确认是否允许补交，学校可能拒绝这次提交</span>
+            <span v-if="isPastDeadline">已过截止时间，提交后会记为补交</span>
             <span v-else>填写内容或添加附件后提交，可直接把文件拖到这里</span>
           </div>
         </div>

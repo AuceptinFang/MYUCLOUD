@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
-  allowsLateSubmission,
   formatBeijingTime,
   getDaysLeft,
   isRecordCompleted,
@@ -62,13 +61,6 @@ test('截止未交按刚过截止的在前排序，往期未交排在已提交�
     normalizeAssignment(record({ id: 'soon', end: daysFromNow(2), status: 2, assignmentStatus: 99, siteId: 'c' })),
   ])
   assert.deepEqual(sorted.map((item) => item.id), ['recent', 'long', 'soon', 'done', 'old'])
-})
-
-test('isOvertimeCommit 决定能否补交，缺失时未知', () => {
-  assert.equal(allowsLateSubmission({ data: { isOvertimeCommit: 0 } }), false)
-  assert.equal(allowsLateSubmission({ isOvertimeCommit: 1 }), true)
-  assert.equal(allowsLateSubmission({ data: {} }), null)
-  assert.equal(allowsLateSubmission(null), null)
 })
 
 // 字段取自真实账号的问卷待办（survey/page/todo）和测验列表（examination/list-stu）
