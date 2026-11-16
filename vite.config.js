@@ -6,6 +6,7 @@ import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 import { backendPlugin } from './vite.backend.js'
+import { agentCliPlugin } from './vite.agent.js'
 import { normalizeBackendOrigin } from './src/utils/backend-url.js'
 
 // 页面版本：CI 里用 GITHUB_SHA，本地构建取 git HEAD；反馈报告据此对应到提交
@@ -38,6 +39,7 @@ export default defineConfig(({ mode }) => {
           this.emitFile({ type: 'asset', fileName: 'CNAME', source: readFileSync(new URL('./CNAME', import.meta.url), 'utf8') })
         },
       }] : []),
+      agentCliPlugin(),
       vue(),
       ...(mode === 'pages' ? [] : [vueDevTools()]),
     ],

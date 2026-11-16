@@ -19,9 +19,10 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  agentCopyLabel: { type: String, default: '' },
 })
 
-const emit = defineEmits(['change-view', 'feedback'])
+const emit = defineEmits(['change-view', 'feedback', 'copy-agent'])
 const shell = ref(null)
 const content = ref(null)
 const reportCoverUrl = normalizeReportCoverUrl(import.meta.env.VITE_REPORT_COVER_URL)
@@ -80,6 +81,14 @@ onUnmounted(() => {
       </nav>
       <div class="header-tools">
         <a v-if="reportCoverUrl" :href="reportCoverUrl">报告封面</a>
+        <button
+          v-if="authenticated && !STATIC_PREVIEW"
+          type="button"
+          title="复制一段提示词，粘贴给 Claude Code 等 agent 后，它可以用命令行直接操作课程、作业、问卷和测验"
+          @click="emit('copy-agent')"
+        >
+          <span aria-live="polite">{{ agentCopyLabel || '复制给 Agent' }}</span>
+        </button>
         <button v-if="!STATIC_PREVIEW" type="button" @click="emit('feedback')">反馈</button>
         <span v-if="authenticated" class="system-account">{{ userLabel }}</span>
       </div>

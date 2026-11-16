@@ -13,6 +13,7 @@
 | 问卷与测验 | 待填问卷、待做测验和作业一起列入待办，都在应用内作答；测验带倒计时、逐题保存和交卷后成绩 |
 | 课表 | 同步周课表并缓存在浏览器，断网或退出后仍可查看已同步内容 |
 | 登录 | UCloud 支持统一认证或 Blade-Auth；教务系统使用独立凭证 |
+| Agent | 页头「复制给 Agent」生成提示词，粘贴给 Claude Code 等 agent 后，它用命令行直接操作课程、作业、问卷和测验 |
 | 界面 | 桌面端课程、待办分栏，窄屏自动纵向排列；支持保存桌面间距设置 |
 
 ## 本地启动
@@ -76,6 +77,7 @@ src/
   vendor/perrin/       间距控制器和样式变量（保留 MIT 许可证）
   workspace.css        当前界面的布局及组件样式
 server/                Hono 后端、学校接口代理和教务会话存储
+agent/                 给 agent 用的命令行工具，构建为 dist/agent/myu.mjs
 tests/                 自动化测试和模拟响应
 docs/                  部署、开发、课表与接口参考
 ```
@@ -86,6 +88,7 @@ docs/                  部署、开发、课表与接口参考
 - [开发说明](docs/development.md)：本地运行、后端结构、Docker、插件与调试页。
 - [课表与教务登录](docs/timetable.md)：同步、缓存、凭证和本地接口。
 - [接口与鉴权参考](docs/api.md)：CAS/OAuth、业务接口（含问卷、测验）、附件和 curl 示例。
+- [给 Agent 用的命令行](docs/agent.md)：复制提示词、命令列表、凭证与续期。
 - [待接入功能](docs/roadmap.md)：测验填空题、主观题的验证和附件。
 
 界面间距工具来源于 [Perrin UI Kit](https://github.com/94yi/perrin-ui-kit)，许可证位于 [src/vendor/perrin/LICENSE](src/vendor/perrin/LICENSE)。

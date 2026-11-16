@@ -7,6 +7,7 @@ import {
   DEFAULT_DEBUG_URL,
   DEFAULT_LOGIN_URL,
   TENANT_ID,
+  REFRESH_TOKEN_KEY,
   TOKEN_KEY,
   assertUcloudOk,
   isTokenExpired,
@@ -47,6 +48,7 @@ import {
 import FeedbackDialog from './components/common/FeedbackDialog.vue'
 import { buildFeedbackReport, collectKnownSecrets } from './utils/feedback-report.js'
 import { jwglSessionId } from './api/jwgl.js'
+import { buildAgentPrompt } from './utils/agent-prompt.js'
 
 const ASSIGNMENT_FETCH_SIZE = 9999
 const debugEnabled = import.meta.env.MODE !== 'pages' && (import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEBUG === 'true')
@@ -66,6 +68,8 @@ const username = ref('')
 const password = ref('')
 const loginUrl = ref(DEFAULT_LOGIN_URL)
 const bladeToken = ref(STATIC_PREVIEW ? '' : localStorage.getItem(TOKEN_KEY) || '')
+const refreshToken = ref(STATIC_PREVIEW ? '' : localStorage.getItem(REFRESH_TOKEN_KEY) || '')
+const agentCopyLabel = ref('')
 const apiUrl = ref(DEFAULT_DEBUG_URL)
 const logs = ref([])
 const loggingIn = ref(false)
@@ -274,7 +278,7 @@ function buildCurrentFeedbackReport() {
     submitView: activeView.value === 'assignment' ? assignmentSubmitView.value : null,
     submitResult: activeView.value === 'assignment' ? assignmentSubmitResult.value : null,
     logs: logs.value,
-    known: collectKnownSecrets({ userInfo: userInfo.value, username: username.value, token: bladeToken.value }),
+    known: [...collectKnownSecrets({ userInfo: userInfo.value, username: username.value, token: bladeToken.value }), refreshToken.value].filter(Boolean),
   })
 }
 
@@ -608,9 +612,12 @@ function normalizeBladeTokenInput(value) {
     .trim()
 }
 
-function saveBladeToken(nextToken, source) {
+function saveBladeToken(nextToken, source, nextRefreshToken = '') {
   bladeToken.value = nextToken
   localStorage.setItem(TOKEN_KEY, nextToken)
+  refreshToken.value = nextRefreshToken
+  if (nextRefreshToken) localStorage.setItem(REFRESH_TOKEN_KEY, nextRefreshToken)
+  else localStorage.removeItem(REFRESH_TOKEN_KEY)
   log('auth:blade-token-saved', {
     source,
     token: nextToken,
@@ -654,7 +661,8 @@ async function login() {
       return
     }
 
-    saveBladeToken(nextToken, 'password-login')
+    const nextRefreshToken = typeof result.body?.refresh_token === 'string' ? result.body.refresh_token : ''
+    saveBladeToken(nextToken, 'password-login', nextRefreshToken)
 
     await loadStudyData()
   } catch (error) {
@@ -1383,6 +1391,8 @@ function clearToken() {
   resetCourseAssignments()
   resetAssignmentDetail()
   localStorage.removeItem(TOKEN_KEY)
+  refreshToken.value = ''
+  localStorage.removeItem(REFRESH_TOKEN_KEY)
   log('auth:token-cleared', {
     storageKey: TOKEN_KEY,
   })
@@ -1401,6 +1411,26 @@ function checkAuth(result, label) {
     throw new Error('Token 已过期，请重新登录')
   }
   assertUcloudOk(result, label)
+}
+
+// 复制给 agent 的提示词带上当前凭证；命令行工具与网页用同一个后端
+async function copyAgentPrompt() {
+  const backend = BACKEND_ORIGIN || window.location.origin
+  const text = buildAgentPrompt({
+    cliUrl: new URL('agent/myu.mjs', document.baseURI).href,
+    backend,
+    token: bladeToken.value,
+    refreshToken: refreshToken.value,
+  })
+  try {
+    await navigator.clipboard.writeText(text)
+    agentCopyLabel.value = refreshToken.value ? '已复制' : '已复制（2 小时内有效）'
+  } catch {
+    window.prompt('复制下面的提示词，粘贴给 agent', text)
+    agentCopyLabel.value = ''
+    return
+  }
+  setTimeout(() => { agentCopyLabel.value = '' }, 2500)
 }
 
 function clearLogs() {
@@ -1445,8 +1475,10 @@ onUnmounted(() => {
     :active-view="activeView"
     :debug-enabled="debugEnabled"
     :plugins="plugins"
+    :agent-copy-label="agentCopyLabel"
     @change-view="setView"
     @feedback="feedbackOpen = true"
+    @copy-agent="copyAgentPrompt"
   >
     <template v-if="activeView === 'study'">
       <AuthBar

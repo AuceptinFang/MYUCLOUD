@@ -3,6 +3,8 @@ import { STATIC_PREVIEW, PREVIEW_MESSAGE, backendUrl } from '../utils/runtime.js
 import { uploadWithProgress } from './upload.js'
 
 export const TOKEN_KEY = 'mock-ucloud-blade-auth'
+// 只给「复制给 Agent」用：网页本身不续期，agent 的命令行工具拿它换新 token
+export const REFRESH_TOKEN_KEY = 'mock-ucloud-refresh-token'
 export const DEFAULT_LOGIN_URL = '/api/login'
 export const DEFAULT_DEBUG_URL = '/ucloud/ykt-basics/info'
 export const BUSINESS_AUTH = 'Basic c3dvcmQ6c3dvcmRfc2VjcmV0'
