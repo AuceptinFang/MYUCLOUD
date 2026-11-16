@@ -75,12 +75,13 @@ onMounted(() => {
       </section>
 
       <form v-else class="feedback-form" @submit.prevent="send">
-        <label>
-          问题类型
-          <select v-model="category">
-            <option v-for="item in FEEDBACK_CATEGORIES" :key="item.value" :value="item.value">{{ item.label }}</option>
-          </select>
-        </label>
+        <fieldset class="feedback-categories">
+          <legend>问题类型</legend>
+          <label v-for="item in FEEDBACK_CATEGORIES" :key="item.value" class="feedback-category">
+            <input v-model="category" type="radio" name="feedback-category" :value="item.value" />
+            <span>{{ item.label }}</span>
+          </label>
+        </fieldset>
         <label>
           遇到了什么问题
           <textarea v-model="message" maxlength="2000" required placeholder="例如：已经交了的作业还显示未交；点提交后一直转圈……" />
@@ -143,6 +144,58 @@ onMounted(() => {
   gap: 6px;
   color: var(--muted);
   font-size: 0.92em;
+}
+/* 问题类型是一排单选标签：选项少，直接点选比下拉框少一步 */
+.feedback-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.feedback-categories legend {
+  margin-bottom: 6px;
+  padding: 0;
+  color: var(--muted);
+  font-size: 0.92em;
+  font-weight: 700;
+}
+.feedback-category {
+  display: inline-flex;
+  position: relative;
+}
+.feedback-category input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  padding: 0;
+  border: 0;
+}
+.feedback-category span {
+  padding: 6px 12px;
+  border: 1px solid #d4d8df;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.feedback-category span:hover {
+  background: #f8fafc;
+}
+.feedback-category input:checked + span {
+  border-color: var(--cloud-blue);
+  background: var(--cloud-blue-soft);
+  color: var(--cloud-blue);
+  font-weight: 650;
+}
+.feedback-category input:focus-visible + span {
+  outline: 2px solid #7496bc;
+  outline-offset: 2px;
 }
 .feedback-form textarea {
   min-height: 110px;
