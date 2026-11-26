@@ -3,6 +3,7 @@ import { parseArgs } from 'node:util'
 import { pathToFileURL } from 'node:url'
 import { CliError, createClient } from './client.js'
 import * as commands from './commands.js'
+import { checkSession } from './session-health.mjs'
 import { GUIDE } from './guide.js'
 
 const OPTIONS = {
@@ -24,6 +25,7 @@ const OPTIONS = {
 const COMMANDS = {
   auth: [commands.auth, ['token']],
   whoami: [commands.whoami, []],
+  'session-check': [(client) => checkSession(client), []],
   courses: [commands.courses, []],
   todo: [commands.todo, []],
   assignment: [commands.assignment, ['id']],
