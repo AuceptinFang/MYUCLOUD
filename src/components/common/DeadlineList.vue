@@ -58,7 +58,7 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits(['update:includeCompleted', 'update:pageSize', 'select'])
+const emit = defineEmits(['update:includeCompleted', 'update:pageSize', 'select', 'batch-review'])
 
 const pageSizeOptions = computed(() =>
   [...new Set([10, 20, 50, 100, Number(props.pageSize)])]
@@ -117,42 +117,47 @@ const assignmentGroups = computed(() => groupAssignments(props.assignments))
           <small>{{ group.hint }}</small>
           <span>{{ group.assignments.length }}</span>
         </h3>
-        <button
-          v-for="assignment in group.assignments"
-          :key="assignment.id"
-          class="feed-assignment"
-          :class="{ selected: assignment.id === selectedAssignmentId }"
-          :disabled="assignment.id === loadingAssignmentId"
-          type="button"
-          @click="emit('select', assignment)"
-        >
-          <span class="feed-assignment-copy">
-            <span class="feed-assignment-title">
-              <span v-if="assignment.kind" class="feed-kind">{{ assignment.kindLabel }}</span>
-              {{ assignment.title }}
+        <div v-for="assignment in group.assignments" :key="assignment.id" class="feed-assignment-entry">
+          <button
+            class="feed-assignment"
+            :class="{ selected: assignment.id === selectedAssignmentId }"
+            :disabled="assignment.id === loadingAssignmentId || (assignment.kind === 'peer-review' && assignment.activityId === loadingAssignmentId)"
+            type="button"
+            @click="emit('select', assignment)"
+          >
+            <span class="feed-assignment-copy">
+              <span class="feed-assignment-title">
+                <span v-if="assignment.kind" class="feed-kind">{{ assignment.kindLabel }}</span>
+                {{ assignment.title }}
+              </span>
+              <span class="feed-assignment-meta">
+                {{ assignment.courseName || '未标注课程' }}
+                <span v-if="assignment.chapter">· {{ assignment.chapter }}</span>
+                <span v-if="assignment.scoreText">· {{ assignment.scoreText }}</span>
+              </span>
+              <span class="feed-assignment-date">
+                <template v-if="assignment.kind === 'quiz' && assignment.beginTime">{{ assignment.beginTime }} 开始，</template>
+                截止 {{ assignment.deadline || '未设置' }}
+              </span>
             </span>
-            <span class="feed-assignment-meta">
-              {{ assignment.courseName || '未标注课程' }}
-              <span v-if="assignment.chapter">· {{ assignment.chapter }}</span>
-              <span v-if="assignment.scoreText">· {{ assignment.scoreText }}</span>
+            <span class="feed-assignment-state">
+              <AssignmentStatus :level="assignment.level" :status="assignment.status" />
+              <span class="feed-relative" :class="`level-${assignment.level}`">
+                {{
+                  assignment.id === loadingAssignmentId
+                    ? '读取中…'
+                    : formatRelativeDeadline(assignment)
+                }}
+              </span>
             </span>
-            <span class="feed-assignment-date">
-              <template v-if="assignment.kind === 'quiz' && assignment.beginTime">{{ assignment.beginTime }} 开始，</template>
-              截止 {{ assignment.deadline || '未设置' }}
-            </span>
-          </span>
-          <span class="feed-assignment-state">
-            <AssignmentStatus :level="assignment.level" :status="assignment.status" />
-            <span class="feed-relative" :class="`level-${assignment.level}`">
-              {{
-                assignment.id === loadingAssignmentId
-                  ? '读取中…'
-                  : formatRelativeDeadline(assignment)
-              }}
-            </span>
-          </span>
-        </button>
+          </button>
+          <button v-if="assignment.kind === 'peer-review' && !assignment.isCompleted && !assignment.isMissed && assignment.status !== '互评未开始'" class="button-secondary peer-todo-batch" type="button" :disabled="assignment.activityId === loadingAssignmentId" @click="emit('batch-review', assignment)">一键互评</button>
+        </div>
       </section>
     </div>
   </section>
 </template>
+
+<style>
+.peer-todo-batch { display: block; margin: 0 0 16px auto; }
+</style>

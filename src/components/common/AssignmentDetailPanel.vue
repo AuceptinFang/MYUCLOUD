@@ -1,9 +1,10 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
+import SafeReviewContent from './SafeReviewContent.vue'
 import VideoPreview from './VideoPreview.vue'
 import { fetchBackend, friendlyError, responseErrorMessage } from '../../api/http.js'
 import { assertUcloudOk } from '../../api/ucloud.js'
-import { parseBeijingTime } from '../../utils/deadline.js'
+import { isSubmitViewSubmitted, parseBeijingTime } from '../../utils/deadline.js'
 import { BUSINESS_AUTH, TENANT_ID, TOKEN_KEY, buildPreviewUrl, buildFileUrl, isVideoResource, getResourcePreviewUrl, pickPreviewData } from '../../api/ucloud'
 
 const props = defineProps({
@@ -19,6 +20,7 @@ const props = defineProps({
     type: Object,
     default: null,
   },
+  submittedResources: { type: Array, default: () => [] },
   resources: {
     type: Array,
     default: () => [],
@@ -54,7 +56,12 @@ const emit = defineEmits(['submit'])
 const fileInput = ref(null)
 const pickedFiles = ref([])
 const assignmentContent = ref('')
-const resourceCount = computed(() => props.resources.length)
+const sections = computed(() => [
+  { key: 'requirements', title: '作业要求', files: props.resources },
+  { key: 'submission', title: '作业', files: props.submittedResources },
+])
+const submittedContent = computed(() => isSubmitViewSubmitted(props.submitView)
+  ? String(props.submitView?.assignmentContent ?? '').trim() : '')
 const attachmentError = ref('')
 const previewingId = ref('')
 const videoPreview = ref(null)
@@ -478,10 +485,9 @@ function submitAssignment() {
     <p v-if="attachmentError" class="notice error" role="alert">{{ attachmentError }}</p>
     <div class="section-header">
       <div>
-        <h2>作业内容</h2>
+        <h2>作业详情</h2>
         <p>{{ assignment ? `${getAssignmentTitle(assignment, detail)} · ${getAssignmentChapter(assignment, detail)}` : '选择作业后显示详情' }}</p>
       </div>
-      <span v-if="assignment" class="section-count">{{ resourceCount }} 个附件</span>
     </div>
 
     <div v-if="!assignment" class="empty-state empty-state-card">
@@ -528,7 +534,11 @@ function submitAssignment() {
           </div>
         </div>
 
-        <div class="assignment-summary-main">
+      </div>
+
+      <section v-for="group in sections" :key="group.key" class="assignment-part" :aria-label="group.title">
+        <h3>{{ group.title }}</h3>
+        <div v-if="group.key === 'requirements'" class="assignment-summary-main">
           <div
             v-if="formatAssignmentContent(assignment, detail) && shouldRenderAssignmentContentHtml(assignment, detail)"
             class="assignment-content-box"
@@ -542,24 +552,13 @@ function submitAssignment() {
             {{ getAssignmentDescription(assignment, detail) }}
           </p>
         </div>
-      </div>
+        <SafeReviewContent v-else-if="submittedContent" :content="submittedContent" />
+        <p v-else-if="!group.files.length" class="assignment-part-empty">
+          {{ !submitView ? '未读取到提交记录' : isSubmitViewSubmitted(submitView) ? '本次提交没有正文或附件' : '尚未提交作业' }}
+        </p>
 
-      <section class="assignment-resources">
-        <div class="subsection-header">
-          <div>
-            <strong>作业附件</strong>
-            <span>{{ resources.length ? `共 ${resources.length} 项` : '教师暂未添加附件' }}</span>
-          </div>
-        </div>
-
-        <div v-if="resources.length === 0" class="empty-state empty-state-card compact">
-          <span class="empty-cloud" aria-hidden="true"><i /><i /></span>
-          <strong>暂无作业附件</strong>
-          <p>本次作业没有需要下载的资源</p>
-        </div>
-
-        <div v-else class="attachment-list">
-          <div v-for="(resource, index) in resources" :key="resource.id || index" class="attachment-row">
+        <div v-if="group.files.length" class="attachment-list">
+          <div v-for="(resource, index) in group.files" :key="resource.id || index" class="attachment-row">
             <div class="attachment-main">
               <a
                 v-if="getResourceUrl(resource)"
@@ -688,3 +687,11 @@ function submitAssignment() {
     </template>
   </section>
 </template>
+
+
+<style scoped>
+.assignment-part { display: grid; gap: 12px; min-width: 0; margin-top: 1.25rem; }
+.assignment-part + .assignment-part { border-top: 1px solid var(--line, #d9dfe6); padding-top: 1.25rem; }
+.assignment-part > h3 { margin: 0; font-size: 1.1rem; }
+.assignment-part-empty { margin: 0; }
+</style>
