@@ -64,7 +64,12 @@ export function createClient({ store = createSessionStore(), backend, fetch = gl
     return session
   }
 
-  async function refresh() {
+  let renewing
+  function refresh() {
+    if (!renewing) renewing = exchange().finally(() => { renewing = undefined })
+    return renewing
+  }
+  async function exchange() {
     if (!session?.refreshToken) return false
     const response = await call(`${origin()}/ucloud/ykt-basics/oauth/token`, {
       method: 'POST',
@@ -72,8 +77,9 @@ export function createClient({ store = createSessionStore(), backend, fetch = gl
       body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: session.refreshToken }),
     })
     const body = await readBody(response)
+    if (response.status >= 500 || response.status === 429) throw new CliError('续期服务暂不可用')
     if (!response.ok || !body?.access_token) return false
-    session = { ...session, token: body.access_token, refreshToken: body.refresh_token || session.refreshToken, savedAt: new Date().toISOString() }
+    session = { ...session, token: body.access_token, expiresAt: Number(body.expires_in) > 0 ? Date.now() + Number(body.expires_in) * 1000 : null, refreshToken: body.refresh_token || session.refreshToken, savedAt: new Date().toISOString() }
     store.write(session)
     return true
   }
@@ -94,8 +100,9 @@ export function createClient({ store = createSessionStore(), backend, fetch = gl
   }
 
   async function request(method, path, options = {}) {
+    const used = session?.token
     let { response, body } = await send(method, path, options)
-    if (isExpired(response, body) && await refresh()) ({ response, body } = await send(method, path, options))
+    if (isExpired(response, body) && (used !== session?.token || await refresh())) ({ response, body } = await send(method, path, options))
     if (isExpired(response, body)) throw new CliError('登录凭证已过期且无法刷新：请在 MYUCLOUD 网页重新登录后再点「复制给 Agent」')
     if (!response.ok || body?.success === false || (body?.code && body.code !== 200)) {
       throw new CliError(`${method} ${path} 失败：${body?.msg || response.status}`, { status: response.status, body })
@@ -113,6 +120,7 @@ export function createClient({ store = createSessionStore(), backend, fetch = gl
 
   return {
     request,
+    refresh,
     download,
     storeDir: store.dir,
     get session() { return session },

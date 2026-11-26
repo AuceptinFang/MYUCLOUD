@@ -40,3 +40,15 @@ MYU_BACKEND=http://127.0.0.1:5173 node agent/cli.js todo
 ```
 
 测试在 [tests/agent.test.js](../tests/agent.test.js)，使用模拟的后端响应。
+
+## 在任务开始前检查登录
+
+运行 `node myu.mjs session-check`。它会查询学校身份接口，不会打开测验或提交作业。结果的 `state` 表示这次检查的结果，`expiresAt` 是预计到期时间（毫秒时间戳，未知时为 null）。
+
+常驻服务可每 5 分钟串行调用一次 `checkSession(client)`，与任务共用同一个 client。距离到期不足 15 分钟时尝试续期；到期时间未知时，以最近一次保存时间为基准，每小时尝试续期。不要让多个独立进程同时轮换同一份凭据。
+
+- `online`：身份已验证，有续期凭据。`online_without_refresh`：身份已验证，但不能自动续期。
+- `renewal_rejected`、`renewal_failed`、`login_required`：应通知用户；分别表示续期被拒、续期请求失败、需要登录。
+- `unverified`：本次未能核实学校身份，不等于已掉线。
+
+需要接入私聊提醒时，把结果交给 `agent/session-alert.mjs` 的 `handleHealth(status, { read, write, notify })`。前两个函数同步读取和持久化本次故障状态；`notify(id, reason)` 使用已有的私聊通知渠道，以 id 为幂等键，成功入队才返回。同一次故障只入队一次；没有续期凭据且临近到期时也会提醒。命令行本身不绑定 QQ 账号或启动后台服务。

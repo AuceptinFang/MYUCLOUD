@@ -16,6 +16,7 @@ export const GUIDE = `# MYUCLOUD 命令行（给 agent 用）
 ## 命令
 
 账户
+- session-check：检查学校会话；临近到期且有续期凭据时自动续期，仅输出状态和时间
 - whoami：当前账号
 - auth <token> [--refresh <refresh_token>] [--backend <地址>]：保存凭证
 - logout：删除本地凭证
