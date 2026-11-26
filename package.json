@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^2.1.1",
+    "dompurify": "^3.5.0",
     "hono": "^4.13.7",
     "vue": "^3.5.32"
   },

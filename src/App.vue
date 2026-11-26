@@ -35,6 +35,9 @@ import CourseResourcePanel from './components/common/CourseResourcePanel.vue'
 import DeadlineList from './components/common/DeadlineList.vue'
 import SurveyPanel from './components/common/SurveyPanel.vue'
 import QuizPanel from './components/common/QuizPanel.vue'
+import PeerReviewPanel from './components/common/PeerReviewPanel.vue'
+import { hasPeerReview } from './utils/peer-review.js'
+import { loadPeerReviewTasks } from './services/peer-review.js'
 import AppShell from './components/layout/AppShell.vue'
 import { usePlugins } from './plugin/index.js'
 import {
@@ -89,8 +92,14 @@ const courseAssignments = ref([])
 const courseAssignmentError = ref('')
 const selectedAssignment = ref(null)
 const assignmentDetail = ref(null)
+const assignmentTab = ref('detail')
+const assignmentPeerOpened = ref(false)
+const reviewBatchRequested = ref(false)
+const peerReviewEnabled = computed(() => hasPeerReview(selectedAssignment.value, assignmentDetail.value))
+watch([routeAssignmentId, bladeToken], () => { assignmentTab.value = 'detail'; assignmentPeerOpened.value = false; reviewBatchRequested.value = false }, { flush: 'sync' })
 const assignmentSubmitView = ref(null)
 const assignmentResources = ref([])
+const submittedResources = ref([])
 const assignmentDetailError = ref('')
 const assignmentSubmitError = ref('')
 const assignmentSubmitResult = ref(null)
@@ -102,6 +111,9 @@ let submitController = null
 const assignments = ref([])
 // 待填的问卷和待做的测验，和作业一起排进首页待办
 const activityTasks = ref([])
+const peerReviewTasks = ref([])
+const peerTodoWarning = ref('')
+let peerTodoRequest = 0
 // 当前作答的问卷；提交后会从待办移除，这里保留标题等信息给页头用
 const selectedSurvey = ref(null)
 const surveyTitle = ref('')
@@ -115,10 +127,11 @@ let courseResourceRequestId = 0
 let courseAssignmentRequestId = 0
 let assignmentDetailRequestId = 0
 
-const todoItems = computed(() => sortAssignments([...assignments.value, ...activityTasks.value]))
+const todoItems = computed(() => sortAssignments([...assignments.value, ...activityTasks.value, ...peerReviewTasks.value]))
 // 往期未交（level missed）只在打开“显示已提交与往期”时列出，不计入待完成
 const pendingAssignments = computed(() =>
-  todoItems.value.filter((assignment) => !assignment.isCompleted && !assignment.isMissed),
+  todoItems.value.filter((assignment) => !assignment.isCompleted && !assignment.isMissed
+    && (assignment.kind !== 'peer-review' || assignment.pendingCount > 0)),
 )
 const urgentAssignments = computed(() =>
   pendingAssignments.value.filter((assignment) => assignment.level === 'danger' || assignment.level === 'warning'),
@@ -127,8 +140,7 @@ const overdueAssignments = computed(() =>
   pendingAssignments.value.filter((assignment) => assignment.level === 'overdue'),
 )
 const visibleAssignments = computed(() =>
-  todoItems.value
-    .filter((assignment) => includeCompleted.value || (!assignment.isCompleted && !assignment.isMissed))
+  (includeCompleted.value ? todoItems.value : pendingAssignments.value)
     .slice(0, Number(assignmentPageSize.value) || 20),
 )
 const userLabel = computed(
@@ -302,6 +314,7 @@ function resetAssignmentDetail() {
   selectedAssignment.value = null
   assignmentDetail.value = null
   assignmentSubmitView.value = null
+  submittedResources.value = []
   assignmentResources.value = []
   assignmentDetailError.value = ''
   assignmentSubmitError.value = ''
@@ -365,8 +378,6 @@ function extractAssignmentDetailResources(body) {
     data.attachmentVOs,
     data.attachmentList,
     data.attachments,
-    data.submitAttachments,
-    data.submitAttachmentList,
     data.workAttachments,
     data.workAttachmentList,
     data.resources,
@@ -411,10 +422,10 @@ function getResourceIdentity(item) {
   )
 }
 
-function mergeAssignmentResources(resources) {
+function replaceSubmittedResources(resources) {
   const seen = new Set()
 
-  assignmentResources.value = [...assignmentResources.value, ...resources].filter((resource, index) => {
+  submittedResources.value = resources.filter((resource, index) => {
     const identity = getResourceIdentity(resource) || `fallback-${index}`
     if (seen.has(identity)) return false
 
@@ -741,6 +752,7 @@ async function loadStudyData() {
       }),
     )
     activityTasks.value = nextActivityTasks
+    await refreshPeerReviewTasks()
 
     lastLoadedAt.value = new Date().toLocaleString()
     syncViewFromHash()
@@ -750,6 +762,16 @@ async function loadStudyData() {
   } finally {
     loadingStudy.value = false
   }
+}
+
+async function refreshPeerReviewTasks() {
+  const token = bladeToken.value
+  if (!token) return
+  const request = ++peerTodoRequest
+  const { tasks, errors } = await loadPeerReviewTasks(token, assignments.value, { previous: peerReviewTasks.value })
+  if (token !== bladeToken.value || request !== peerTodoRequest) return
+  peerReviewTasks.value = tasks
+  peerTodoWarning.value = errors.length ? '部分互评待办未能更新，请刷新重试；作业提交状态不代表互评已完成。' : ''
 }
 
 // 问卷和测验各自单独请求，读不到时不影响作业列表
@@ -960,6 +982,8 @@ async function loadAssignmentResourceDetails(rawResources, requestId) {
 }
 
 async function loadSubmitAttachmentResources(attachmentIds, requestId) {
+  if (requestId !== assignmentDetailRequestId) return
+  submittedResources.value = []
   if (attachmentIds.length === 0) return
 
   try {
@@ -977,7 +1001,7 @@ async function loadSubmitAttachmentResources(attachmentIds, requestId) {
 
     if (requestId !== assignmentDetailRequestId) return
 
-    mergeAssignmentResources(resources)
+    replaceSubmittedResources(resources)
   } catch (error) {
     logError('study:submit-attachment-resource:error', error)
   }
@@ -989,6 +1013,7 @@ async function loadAssignmentResources(assignment) {
   selectedAssignment.value = assignment
   assignmentDetail.value = null
   assignmentSubmitView.value = null
+  submittedResources.value = []
   assignmentResources.value = []
   assignmentDetailError.value = ''
   assignmentSubmitError.value = ''
@@ -1090,6 +1115,7 @@ function backToCourse(panel) {
 }
 
 function openTodoItem(item) {
+  if (item.kind === 'peer-review') { openPeerReviewTodo(item); return }
   if (item.kind === 'survey') {
     openSurvey(item)
     return
@@ -1100,6 +1126,15 @@ function openTodoItem(item) {
   }
 
   openAssignment(item)
+}
+
+function openPeerReviewTodo(item, batch = false) {
+  const assignment = assignments.value.find((entry) => String(entry.id) === item.activityId)
+  if (!assignment) return
+  openAssignment(assignment)
+  assignmentTab.value = 'review'
+  assignmentPeerOpened.value = true
+  reviewBatchRequested.value = batch
 }
 
 function openSurvey(survey) {
@@ -1337,6 +1372,7 @@ async function submitSelectedAssignment({ assignment, content, files = [] }) {
     if (controller.signal.aborted) return
 
     if (confirmation.confirmed) {
+      assignmentSubmitView.value = confirmation.body?.data ?? confirmation.body
       for (const file of files) uploadedAttachmentCache.delete(getAttachmentCacheKey(assignmentId, file))
       const submitTime = pickSubmitTime(confirmation.body) || pickSubmitTime(submitCall.result.body) || ''
       assignmentSubmitResult.value = {
@@ -1383,6 +1419,9 @@ function clearToken() {
   courses.value = []
   assignments.value = []
   activityTasks.value = []
+  peerTodoRequest++
+  peerReviewTasks.value = []
+  peerTodoWarning.value = ''
   selectedSurvey.value = null
   surveyTitle.value = ''
   selectedQuiz.value = null
@@ -1498,6 +1537,7 @@ onUnmounted(() => {
       <section v-if="studyError" class="notice error">
         {{ studyError }}
       </section>
+      <section v-if="peerTodoWarning" class="notice warning" role="status">{{ peerTodoWarning }} <button class="button-secondary" type="button" @click="refreshPeerReviewTasks">刷新互评待办</button></section>
 
       <section v-if="userInfo" class="study-overview" aria-label="学习概览">
         <div class="overview-heading">
@@ -1535,7 +1575,9 @@ onUnmounted(() => {
           v-model:include-completed="includeCompleted"
           v-model:page-size="assignmentPageSize"
           title="待办"
+          empty-text="暂无待办"
           :assignments="visibleAssignments"
+          @batch-review="openPeerReviewTodo($event, true)"
           :last-loaded-at="lastLoadedAt"
           :loading="loadingStudy"
           :loading-assignment-id="loadingAssignmentId"
@@ -1622,19 +1664,40 @@ onUnmounted(() => {
           </div>
         </div>
       </section>
-      <AssignmentDetailPanel
-        :assignment="selectedAssignment"
-        :detail="assignmentDetail"
-        :error="assignmentDetailError"
-        :loading="Boolean(loadingAssignmentId)"
-        :resources="assignmentResources"
+      <nav v-if="peerReviewEnabled" class="context-tabs assignment-tabs" aria-label="作业视图">
+        <button type="button" :class="{ active: assignmentTab === 'detail' }" :aria-pressed="assignmentTab === 'detail'" @click="assignmentTab = 'detail'">作业详情</button>
+        <button type="button" :class="{ active: assignmentTab === 'review' }" :aria-pressed="assignmentTab === 'review'" @click="assignmentTab = 'review'; assignmentPeerOpened = true">作业互评</button>
+      </nav>
+      <PeerReviewPanel
+        v-if="peerReviewEnabled && assignmentPeerOpened"
+        v-show="assignmentTab === 'review'"
+        :key="String(selectedAssignment?.id || '')"
+        :assignment-id="String(selectedAssignment?.id || '')"
+        :title="selectedAssignment?.title || assignmentDetail?.assignmentTitle || ''"
+        :token="bladeToken"
+        :rules="assignmentDetail?.assignmentMutualEvaluation || {}"
         :submit-view="assignmentSubmitView"
-        :submit-error="assignmentSubmitError"
-        :submit-result="assignmentSubmitResult"
-        :upload-progress="uploadProgress"
-        :submitting="submittingAssignment"
-        @submit="submitSelectedAssignment"
+        :batch-requested="reviewBatchRequested"
+        @batch-opened="reviewBatchRequested = false"
+        @updated="refreshPeerReviewTasks"
+        @expired="handleTokenExpiry('assignment')"
       />
+      <div v-show="!peerReviewEnabled || assignmentTab === 'detail'">
+        <AssignmentDetailPanel
+          :assignment="selectedAssignment"
+          :detail="assignmentDetail"
+          :error="assignmentDetailError"
+          :loading="Boolean(loadingAssignmentId)"
+          :resources="assignmentResources"
+          :submitted-resources="submittedResources"
+          :submit-view="assignmentSubmitView"
+          :submit-error="assignmentSubmitError"
+          :submit-result="assignmentSubmitResult"
+          :upload-progress="uploadProgress"
+          :submitting="submittingAssignment"
+          @submit="submitSelectedAssignment"
+        />
+      </div>
     </template>
 
     <template v-else-if="activeView === 'survey'">
